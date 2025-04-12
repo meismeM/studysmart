@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const grades = [
+  "9th Grade",
   "1st Grade",
   "2nd Grade",
   "3rd Grade",
@@ -20,7 +21,6 @@ const grades = [
   "6th Grade",
   "7th Grade",
   "8th Grade",
-  "9th Grade",
   "10th Grade",
   "11th Grade",
   "12th Grade",
@@ -36,20 +36,39 @@ const subjects = [
 ];
 
 const Dashboard = () => {
-  const [grade, setGrade] = useState("");
+  const [grade, setGrade] = useState("9th Grade"); // Default to Grade 9
   const [subject, setSubject] = useState("");
   const [chapterContent, setChapterContent] = useState("");
   const [generatedQuestions, setGeneratedQuestions] = useState<string[]>([]);
   const [generatedNotes, setGeneratedNotes] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-      // Here, you would typically read the file content. For simplicity, we're just setting the file.
-      // In a real application, you might want to read the file content and set it to chapterContent.
-      setChapterContent(''); // Clear the chapter content if a file is uploaded
+
+      // Placeholder for saving the file on the server
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("grade", grade);
+
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.ok) {
+          alert("File uploaded successfully!");
+        } else {
+          alert("File upload failed.");
+        }
+      } catch (error) {
+        console.error("Error uploading file:", error);
+        alert("Error uploading file.");
+      }
+      setChapterContent('');
     }
   };
 
@@ -118,7 +137,7 @@ const Dashboard = () => {
           <CardContent className="grid gap-4">
             <div>
               <Label htmlFor="grade">Grade</Label>
-              <Select onValueChange={setGrade}>
+              <Select onValueChange={setGrade} defaultValue={grade}>
                 <SelectTrigger id="grade">
                   <SelectValue placeholder="Select grade" />
                 </SelectTrigger>

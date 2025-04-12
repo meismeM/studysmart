@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -48,7 +49,6 @@ const Dashboard = () => {
     if (file) {
       setSelectedFile(file);
 
-      // Placeholder for saving the file on the server
       try {
         const formData = new FormData();
         formData.append("file", file);
@@ -60,7 +60,13 @@ const Dashboard = () => {
         });
 
         if (response.ok) {
-          alert("File uploaded successfully!");
+          const responseData = await response.json();
+          if (responseData.textContent) {
+            setChapterContent(responseData.textContent);
+            alert("File uploaded and text extracted successfully!");
+          } else {
+            alert("File uploaded successfully, but no text content was extracted.");
+          }
         } else {
           alert("File upload failed.");
         }
@@ -68,7 +74,6 @@ const Dashboard = () => {
         console.error("Error uploading file:", error);
         alert("Error uploading file.");
       }
-      setChapterContent('');
     }
   };
 
@@ -80,10 +85,7 @@ const Dashboard = () => {
 
     let content = chapterContent;
     if (selectedFile) {
-      // Handle the case where a file is uploaded
-      // For simplicity, we'll just alert the user
-      alert("Generating questions based on uploaded file is not yet supported. Please enter chapter content manually.");
-      return;
+      //content will set to the one from the pdf
     } else if (!content) {
       alert("Please enter chapter content or upload a textbook.");
       return;
@@ -106,10 +108,7 @@ const Dashboard = () => {
 
     let content = chapterContent;
     if (selectedFile) {
-      // Handle the case where a file is uploaded
-      // For simplicity, we'll just alert the user
-      alert("Generating notes based on uploaded file is not yet supported. Please enter chapter content manually.");
-      return;
+          //content will set to the one from the pdf
     } else if (!content) {
       alert("Please enter chapter content or upload a textbook.");
       return;

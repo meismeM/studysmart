@@ -18,7 +18,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ setIsLoggedIn }) => {
   const [registerUsername, setRegisterUsername] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
-  const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
   const { toast } = useToast();
 
@@ -26,7 +25,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ setIsLoggedIn }) => {
     e.preventDefault();
     // In a real application, you would authenticate against a backend service
     if (loginUsername === "admin" && loginPassword === "password") {
-      setIsLoggedIn(true);
+      setIsLoggedIn(true); // Set isLoggedIn to true upon successful login
     } else {
       toast({
         title: "Error",
@@ -49,14 +48,11 @@ const AuthForm: React.FC<AuthFormProps> = ({ setIsLoggedIn }) => {
     }
 
     // Simulate successful registration
-    setRegistrationSuccess(true);
-    setRegisterUsername("");
-    setRegisterPassword("");
-
     toast({
       title: "Success",
       description: "Registration successful!",
     });
+    setIsLoggedIn(true); // Set isLoggedIn to true upon successful registration
   };
 
   return (

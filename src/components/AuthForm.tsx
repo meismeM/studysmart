@@ -6,30 +6,57 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
 
 interface AuthFormProps {
   setIsLoggedIn: (isLoggedIn: boolean) => void;
 }
 
 const AuthForm: React.FC<AuthFormProps> = ({ setIsLoggedIn }) => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [registerUsername, setRegisterUsername] = useState("");
+  const [registerPassword, setRegisterPassword] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
+
+  const { toast } = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // In a real application, you would authenticate against a backend service
-    if (username === "admin" && password === "password") {
+    if (loginUsername === "admin" && loginPassword === "password") {
       setIsLoggedIn(true);
     } else {
-      alert("Invalid credentials");
+      toast({
+        title: "Error",
+        description: "Invalid credentials",
+        variant: "destructive",
+      });
     }
   };
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real application, you would register the user against a backend service
-    alert("Registration functionality not implemented yet.");
+
+    if (!registerUsername || !registerPassword) {
+      toast({
+        title: "Error",
+        description: "Username and password cannot be empty.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Simulate successful registration
+    setRegistrationSuccess(true);
+    setRegisterUsername("");
+    setRegisterPassword("");
+
+    toast({
+      title: "Success",
+      description: "Registration successful!",
+    });
   };
 
   return (
@@ -51,8 +78,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ setIsLoggedIn }) => {
                   <Input
                     type="text"
                     id="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    value={loginUsername}
+                    onChange={(e) => setLoginUsername(e.target.value)}
                     placeholder="Enter your username"
                   />
                 </div>
@@ -61,8 +88,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ setIsLoggedIn }) => {
                   <Input
                     type="password"
                     id="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="Enter your password"
                   />
                 </div>
@@ -76,8 +103,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ setIsLoggedIn }) => {
                   <Input
                     type="text"
                     id="newUsername"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    value={registerUsername}
+                    onChange={(e) => setRegisterUsername(e.target.value)}
                     placeholder="Enter your username"
                   />
                 </div>
@@ -86,8 +113,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ setIsLoggedIn }) => {
                   <Input
                     type="password"
                     id="newPassword"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={registerPassword}
+                    onChange={(e) => setRegisterPassword(e.target.value)}
                     placeholder="Enter your password"
                   />
                 </div>
@@ -102,5 +129,3 @@ const AuthForm: React.FC<AuthFormProps> = ({ setIsLoggedIn }) => {
 };
 
 export default AuthForm;
-
-    

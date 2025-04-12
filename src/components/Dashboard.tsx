@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,6 +10,7 @@ import { generateStudyQuestions } from "@/ai/flows/generate-study-questions";
 import { generateNotes } from "@/ai/flows/generate-notes";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
 
 const grades = [
   "9th Grade",
@@ -37,12 +37,25 @@ const subjects = [
 ];
 
 const Dashboard = () => {
-  const [grade, setGrade] = useState("9th Grade"); // Default to Grade 9
+  const [grade, setGrade] = useState("");
   const [subject, setSubject] = useState("");
   const [chapterContent, setChapterContent] = useState("");
   const [generatedQuestions, setGeneratedQuestions] = useState<string[]>([]);
   const [generatedNotes, setGeneratedNotes] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadedTextbookURL, setUploadedTextbookURL] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+      // Load textbooks from local storage on component mount
+      const storedGrade = localStorage.getItem('selectedGrade') || '';
+      const storedSubject = localStorage.getItem('selectedSubject') || '';
+      const storedTextbookURL = localStorage.getItem('uploadedTextbookURL') || '';
+
+      setGrade(storedGrade);
+      setSubject(storedSubject);
+      setUploadedTextbookURL(storedTextbookURL);
+  }, []);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -63,36 +76,58 @@ const Dashboard = () => {
           const responseData = await response.json();
           if (responseData.textContent) {
             setChapterContent(responseData.textContent);
-            alert("File uploaded and text extracted successfully!");
+            setUploadedTextbookURL(`/textbooks/${grade}/${file.name}`);
+
+            localStorage.setItem('uploadedTextbookURL', `/textbooks/${grade}/${file.name}`);
+            localStorage.setItem('selectedGrade', grade);
+            localStorage.setItem('selectedSubject', subject);
+            toast({
+              title: "Success",
+              description: "File uploaded and text extracted successfully!",
+            });
           } else {
-            alert("File uploaded successfully, but no text content was extracted.");
+            toast({
+              title: "Warning",
+              description: "File uploaded successfully, but no text content was extracted.",
+            });
           }
         } else {
-          alert("File upload failed.");
+          toast({
+            title: "Error",
+            description: "File upload failed.",
+            variant: "destructive",
+          });
         }
       } catch (error) {
         console.error("Error uploading file:", error);
-        alert("Error uploading file.");
+        toast({
+          title: "Error",
+          description: "Error uploading file.",
+          variant: "destructive",
+        });
       }
     }
   };
 
   const handleGenerateQuestions = async (questionType: "multiple-choice" | "short-answer" | "fill-in-the-blank") => {
     if (!grade || !subject) {
-      alert("Please select grade and subject.");
+      toast({
+        title: "Warning",
+        description: "Please select grade and subject.",
+      });
       return;
     }
 
-    let content = chapterContent;
-    if (selectedFile) {
-      //content will set to the one from the pdf
-    } else if (!content) {
-      alert("Please enter chapter content or upload a textbook.");
+    if (!chapterContent) {
+      toast({
+        title: "Warning",
+        description: "Please enter chapter content or upload a textbook.",
+      });
       return;
     }
 
     const result = await generateStudyQuestions({
-      chapterContent: content,
+      chapterContent: chapterContent,
       questionType,
       numberOfQuestions: 5, // You can make this dynamic later
     });
@@ -102,21 +137,24 @@ const Dashboard = () => {
 
   const handleGenerateNotes = async () => {
     if (!grade || !subject) {
-      alert("Please select grade and subject.");
+      toast({
+        title: "Warning",
+        description: "Please select grade and subject.",
+      });
       return;
     }
 
-    let content = chapterContent;
-    if (selectedFile) {
-          //content will set to the one from the pdf
-    } else if (!content) {
-      alert("Please enter chapter content or upload a textbook.");
+    if (!chapterContent) {
+      toast({
+        title: "Warning",
+        description: "Please enter chapter content or upload a textbook.",
+      });
       return;
     }
 
 
     const result = await generateNotes({
-      textbookChapter: content,
+      textbookChapter: chapterContent,
       gradeLevel: grade,
       subject: subject,
     });
@@ -151,7 +189,7 @@ const Dashboard = () => {
             </div>
             <div>
               <Label htmlFor="subject">Subject</Label>
-              <Select onValueChange={setSubject}>
+              <Select onValueChange={setSubject} defaultValue={subject}>
                 <SelectTrigger id="subject">
                   <SelectValue placeholder="Select subject" />
                 </SelectTrigger>
@@ -169,14 +207,20 @@ const Dashboard = () => {
                 <Input
                   type="file"
                   id="textbookUpload"
-                  accept=".pdf,.txt,.docx" // Adjust accepted file types as needed
+                  accept=".pdf,.txt,.docx"
                   onChange={handleFileUpload}
                 />
                 {selectedFile && (
                   <p className="mt-2">Selected file: {selectedFile.name}</p>
                 )}
+                 {uploadedTextbookURL && (
+                    <Button asChild variant="link">
+                        <a href={uploadedTextbookURL} target="_blank" rel="noopener noreferrer">
+                            View Uploaded Textbook
+                        </a>
+                    </Button>
+                )}
               </div>
-            {!selectedFile && (
               <div>
                 <Label htmlFor="chapterContent">Chapter Content</Label>
                 <Textarea
@@ -186,7 +230,6 @@ const Dashboard = () => {
                   onChange={(e) => setChapterContent(e.target.value)}
                 />
               </div>
-            )}
           </CardContent>
         </Card>
 

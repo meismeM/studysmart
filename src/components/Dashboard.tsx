@@ -41,15 +41,37 @@ const Dashboard = () => {
   const [chapterContent, setChapterContent] = useState("");
   const [generatedQuestions, setGeneratedQuestions] = useState<string[]>([]);
   const [generatedNotes, setGeneratedNotes] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      // Here, you would typically read the file content. For simplicity, we're just setting the file.
+      // In a real application, you might want to read the file content and set it to chapterContent.
+      setChapterContent(''); // Clear the chapter content if a file is uploaded
+    }
+  };
 
   const handleGenerateQuestions = async (questionType: "multiple-choice" | "short-answer" | "fill-in-the-blank") => {
-    if (!grade || !subject || !chapterContent) {
-      alert("Please select grade, subject, and enter chapter content.");
+    if (!grade || !subject) {
+      alert("Please select grade and subject.");
+      return;
+    }
+
+    let content = chapterContent;
+    if (selectedFile) {
+      // Handle the case where a file is uploaded
+      // For simplicity, we'll just alert the user
+      alert("Generating questions based on uploaded file is not yet supported. Please enter chapter content manually.");
+      return;
+    } else if (!content) {
+      alert("Please enter chapter content or upload a textbook.");
       return;
     }
 
     const result = await generateStudyQuestions({
-      chapterContent,
+      chapterContent: content,
       questionType,
       numberOfQuestions: 5, // You can make this dynamic later
     });
@@ -58,13 +80,25 @@ const Dashboard = () => {
   };
 
   const handleGenerateNotes = async () => {
-    if (!grade || !subject || !chapterContent) {
-      alert("Please select grade, subject, and enter chapter content.");
+    if (!grade || !subject) {
+      alert("Please select grade and subject.");
       return;
     }
 
+    let content = chapterContent;
+    if (selectedFile) {
+      // Handle the case where a file is uploaded
+      // For simplicity, we'll just alert the user
+      alert("Generating notes based on uploaded file is not yet supported. Please enter chapter content manually.");
+      return;
+    } else if (!content) {
+      alert("Please enter chapter content or upload a textbook.");
+      return;
+    }
+
+
     const result = await generateNotes({
-      textbookChapter: chapterContent,
+      textbookChapter: content,
       gradeLevel: grade,
       subject: subject,
     });
@@ -112,15 +146,29 @@ const Dashboard = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="chapterContent">Chapter Content</Label>
-              <Textarea
-                id="chapterContent"
-                placeholder="Enter chapter content..."
-                value={chapterContent}
-                onChange={(e) => setChapterContent(e.target.value)}
-              />
-            </div>
+             <div>
+                <Label htmlFor="textbookUpload">Upload Textbook</Label>
+                <Input
+                  type="file"
+                  id="textbookUpload"
+                  accept=".pdf,.txt,.docx" // Adjust accepted file types as needed
+                  onChange={handleFileUpload}
+                />
+                {selectedFile && (
+                  <p className="mt-2">Selected file: {selectedFile.name}</p>
+                )}
+              </div>
+            {!selectedFile && (
+              <div>
+                <Label htmlFor="chapterContent">Chapter Content</Label>
+                <Textarea
+                  id="chapterContent"
+                  placeholder="Enter chapter content..."
+                  value={chapterContent}
+                  onChange={(e) => setChapterContent(e.target.value)}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
 

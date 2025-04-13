@@ -21,7 +21,7 @@ const textbooks = {
 };
 
 interface Chapter {
-  chapter: string;
+  page_number: number;
   text: string;
 }
 
@@ -43,7 +43,12 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
           if (response.ok) {
             const data: TextbookData = await response.json();
             if (Array.isArray(data.chunks)) {
-              setChapters(data.chunks);
+              // Map the chunks to add a unique 'chapter' string
+              const enrichedChapters = data.chunks.map((chunk, index) => ({
+                ...chunk,
+                chapter: `Page ${chunk.page_number}`,
+              }));
+              setChapters(enrichedChapters);
             } else {
               console.error("Invalid data format: chunks is not an array.");
               setChapters([]);
@@ -66,7 +71,7 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
 
   useEffect(() => {
     if (selectedChapter) {
-      const chapterContent = chapters.find(c => c.chapter === selectedChapter)?.text || "";
+      const chapterContent = chapters.find(c => c.text === selectedChapter)?.text || "";
       setSelectedChapterContent(chapterContent);
     }
   }, [selectedChapter, chapters, setSelectedChapterContent]);
@@ -100,8 +105,9 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
                 <SelectValue placeholder="Select chapter" />
               </SelectTrigger>
               <SelectContent>
-                {chapters.map((chapter) => (
-                  <SelectItem key={chapter.text} value={chapter.text}>
+                {chapters.map((chapter, index) => (
+                  // Use a unique key based on textbook_id and index
+                  <SelectItem key={`${textbooks[subject]}-${index}`} value={chapter.text}>
                     {chapter.chapter}
                   </SelectItem>
                 ))}

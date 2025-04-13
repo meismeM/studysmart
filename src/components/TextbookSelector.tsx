@@ -12,14 +12,14 @@ interface TextbookSelectorProps {
 }
 
 const textbooks = {
-  "biology": "biology9_index.json",
-  "chemistry": "chemistry9_index.json",
-  "citizenship": "citizenship9_index.json",
-  "economics": "economics9_index.json",
-  "english": "english9_index.json",
-  "geography": "geography9_index.json",
-  "history": "history9_index.json",
-  "physics": "physics9_index.json",
+  "biology": "textbooks/biology9_index.json",
+  "chemistry": "textbooks/chemistry9_index.json",
+  "citizenship": "textbooks/citizenship9_index.json",
+  "economics": "textbooks/economics9_index.json",
+  "english": "textbooks/english9_index.json",
+  "geography": "textbooks/geography9_index.json",
+  "history": "textbooks/history9_index.json",
+  "physics": "textbooks/physics9_index.json",
 };
 
 interface Chapter {
@@ -63,7 +63,7 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({setSelectedChapterCo
         setChapters([]);
         toast({
           title: "Error",
-          description: `Failed to load textbook data: ${error.message}`,
+          description: `Failed to load textbook data: ${error.message}.  Make sure that the  'public/textbooks' folder contains valid json textbook files`,
           variant: "destructive",
         });
       }

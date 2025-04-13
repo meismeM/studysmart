@@ -5,6 +5,7 @@ import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Label} from "@/components/ui/label";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {Input} from "@/components/ui/input";
+import { useToast } from '@/hooks/use-toast';
 
 interface TextbookSelectorProps {
   setSelectedChapterContent: (content: string) => void;
@@ -24,7 +25,6 @@ const textbooks = {
 interface Chapter {
   page_number: number;
   text: string;
-  chapter: string;
 }
 
 interface TextbookData {
@@ -35,7 +35,9 @@ interface TextbookData {
 const TextbookSelector: React.FC<TextbookSelectorProps> = ({setSelectedChapterContent}) => {
   const [subject, setSubject] = useState("");
   const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
+  const [startPage, setStartPage] = useState<number | undefined>(undefined);
+  const [endPage, setEndPage] = useState<number | undefined>(undefined);
+  const { toast } = useToast();
 
   const loadChapters = useCallback(async (selectedSubject: string) => {
     if (selectedSubject && textbooks[selectedSubject]) {
@@ -46,42 +48,58 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({setSelectedChapterCo
         }
         const data: TextbookData = await response.json();
         if (Array.isArray(data.chunks)) {
-          // Map over the chunks and add a displayable chapter name (page)
-          const enrichedChapters = data.chunks.map((chunk) => ({
-            ...chunk,
-            chapter: `Page ${chunk.page_number}`,
-          }));
-          setChapters(enrichedChapters);
+          setChapters(data.chunks);
         } else {
           console.error("Invalid data format: chunks is not an array.");
           setChapters([]);
+          toast({
+            title: "Error",
+            description: "Invalid data format in textbook data.",
+            variant: "destructive",
+          });
         }
       } catch (error: any) {
         console.error("Error loading chapter index:", error);
         setChapters([]);
+        toast({
+          title: "Error",
+          description: `Failed to load textbook data: ${error.message}`,
+          variant: "destructive",
+        });
       }
     } else {
       setChapters([]);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (subject) {
       loadChapters(subject);
+      setStartPage(undefined);
+      setEndPage(undefined);
     }
   }, [subject, loadChapters]);
 
   useEffect(() => {
-    if (selectedChapters && selectedChapters.length > 0) {
+    if (chapters && chapters.length > 0 && startPage && endPage) {
+      if (startPage > endPage) {
+        toast({
+          title: "Warning",
+          description: "Start page cannot be greater than end page.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const selectedContent = chapters
-        .filter(chapter => selectedChapters.includes(chapter.chapter))
+        .filter(chapter => chapter.page_number >= startPage && chapter.page_number <= endPage)
         .map(chapter => chapter.text)
         .join("\n\n");
       setSelectedChapterContent(selectedContent);
     } else {
       setSelectedChapterContent("");
     }
-  }, [selectedChapters, chapters, setSelectedChapterContent]);
+  }, [chapters, startPage, endPage, setSelectedChapterContent, toast]);
 
   return (
     <div className="container mx-auto p-4">
@@ -105,24 +123,31 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({setSelectedChapterCo
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label htmlFor="chapter">Chapter(s)</Label>
-            <Select
-              multiple
-              onValueChange={setSelectedChapters}
-              defaultValue={[]}
-            >
-              <SelectTrigger id="chapter">
-                <SelectValue placeholder="Select chapter(s)" />
-              </SelectTrigger>
-              <SelectContent>
-                {chapters.map((chapter) => (
-                  <SelectItem key={chapter.text} value={chapter.chapter}>
-                    {chapter.chapter}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label htmlFor="startPage">Start Page</Label>
+              <Input
+                type="number"
+                id="startPage"
+                placeholder="Start Page"
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  setStartPage(isNaN(value) ? undefined : value);
+                }}
+              />
+            </div>
+            <div>
+              <Label htmlFor="endPage">End Page</Label>
+              <Input
+                type="number"
+                id="endPage"
+                placeholder="End Page"
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  setEndPage(isNaN(value) ? undefined : value);
+                }}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

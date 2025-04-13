@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+import {useState, useEffect, useCallback} from "react";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Label} from "@/components/ui/label";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {Input} from "@/components/ui/input";
 
 interface TextbookSelectorProps {
   setSelectedChapterContent: (content: string) => void;
@@ -32,62 +32,56 @@ interface TextbookData {
   textbook_id?: string;
 }
 
-const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterContent }) => {
+const TextbookSelector: React.FC<TextbookSelectorProps> = ({setSelectedChapterContent}) => {
   const [subject, setSubject] = useState("");
   const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [startPage, setStartPage] = useState<number | null>(null);
-  const [endPage, setEndPage] = useState<number | null>(null);
+  const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
 
-  useEffect(() => {
-    const loadChapters = async () => {
-      if (subject && textbooks[subject]) {
-        try {
-          const response = await fetch(`/textbooks/${textbooks[subject]}`);
-          if (response.ok) {
-            const data: TextbookData = await response.json();
-            if (Array.isArray(data.chunks)) {
-              const enrichedChapters = data.chunks.map((chunk) => ({
-                ...chunk,
-                chapter: `Page ${chunk.page_number}`,
-              }));
-              setChapters(enrichedChapters);
-            } else {
-              console.error("Invalid data format: chunks is not an array.");
-              setChapters([]);
-            }
-          } else {
-            console.error("Failed to load chapter index.");
-            setChapters([]);
-          }
-        } catch (error) {
-          console.error("Error loading chapter index:", error);
+  const loadChapters = useCallback(async (selectedSubject: string) => {
+    if (selectedSubject && textbooks[selectedSubject]) {
+      try {
+        const response = await fetch(`/${textbooks[selectedSubject]}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch textbook data: ${response.status}`);
+        }
+        const data: TextbookData = await response.json();
+        if (Array.isArray(data.chunks)) {
+          // Map over the chunks and add a displayable chapter name (page)
+          const enrichedChapters = data.chunks.map((chunk) => ({
+            ...chunk,
+            chapter: `Page ${chunk.page_number}`,
+          }));
+          setChapters(enrichedChapters);
+        } else {
+          console.error("Invalid data format: chunks is not an array.");
           setChapters([]);
         }
-      } else {
+      } catch (error: any) {
+        console.error("Error loading chapter index:", error);
         setChapters([]);
       }
-      setStartPage(null);
-      setEndPage(null);
-    };
-
-    loadChapters();
-  }, [subject]);
+    } else {
+      setChapters([]);
+    }
+  }, []);
 
   useEffect(() => {
-    if (startPage !== null && endPage !== null && chapters.length > 0) {
-      const start = Math.min(startPage, endPage);
-      const end = Math.max(startPage, endPage);
+    if (subject) {
+      loadChapters(subject);
+    }
+  }, [subject, loadChapters]);
 
+  useEffect(() => {
+    if (selectedChapters && selectedChapters.length > 0) {
       const selectedContent = chapters
-        .filter(chapter => chapter.page_number >= start && chapter.page_number <= end)
+        .filter(chapter => selectedChapters.includes(chapter.chapter))
         .map(chapter => chapter.text)
         .join("\n\n");
-
       setSelectedChapterContent(selectedContent);
     } else {
       setSelectedChapterContent("");
     }
-  }, [startPage, endPage, chapters, setSelectedChapterContent]);
+  }, [selectedChapters, chapters, setSelectedChapterContent]);
 
   return (
     <div className="container mx-auto p-4">
@@ -111,27 +105,24 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label htmlFor="startPage">Start Page</Label>
-              <Input
-                type="number"
-                id="startPage"
-                placeholder="Start Page"
-                onChange={(e) => setStartPage(Number(e.target.value))}
-                min="1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="endPage">End Page</Label>
-              <Input
-                type="number"
-                id="endPage"
-                placeholder="End Page"
-                onChange={(e) => setEndPage(Number(e.target.value))}
-                min="1"
-              />
-            </div>
+          <div>
+            <Label htmlFor="chapter">Chapter(s)</Label>
+            <Select
+              multiple
+              onValueChange={setSelectedChapters}
+              defaultValue={[]}
+            >
+              <SelectTrigger id="chapter">
+                <SelectValue placeholder="Select chapter(s)" />
+              </SelectTrigger>
+              <SelectContent>
+                {chapters.map((chapter) => (
+                  <SelectItem key={chapter.text} value={chapter.chapter}>
+                    {chapter.chapter}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>

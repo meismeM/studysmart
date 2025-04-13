@@ -1,0 +1,22 @@
+[
+  {
+    "chapter": "Chapter 1: Introduction to Physics",
+    "content": "This chapter introduces the basic concepts of physics, including measurement, units, and scientific notation."
+  },
+  {
+    "chapter": "Chapter 2: Motion",
+    "content": "This chapter explores the concepts of motion, including speed, velocity, acceleration, and the laws of motion."
+  },
+  {
+    "chapter": "Chapter 3: Energy",
+    "content": "This chapter examines the different forms of energy, including kinetic energy, potential energy, and the conservation of energy."
+  },
+  {
+    "chapter": "Chapter 4: Heat",
+    "content": "This chapter explores the concepts of heat and temperature, including heat transfer, specific heat, and the laws of thermodynamics."
+  },
+  {
+    "chapter": "Chapter 5: Waves",
+    "content": "This chapter examines the properties of waves, including wavelength, frequency, amplitude, and the different types of waves."
+  }
+]

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
 interface TextbookSelectorProps {
   setSelectedChapterContent: (content: string) => void;
@@ -34,7 +35,8 @@ interface TextbookData {
 const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterContent }) => {
   const [subject, setSubject] = useState("");
   const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
+  const [startPage, setStartPage] = useState<number | null>(null);
+  const [endPage, setEndPage] = useState<number | null>(null);
 
   useEffect(() => {
     const loadChapters = async () => {
@@ -44,7 +46,7 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
           if (response.ok) {
             const data: TextbookData = await response.json();
             if (Array.isArray(data.chunks)) {
-              const enrichedChapters = data.chunks.map((chunk, index) => ({
+              const enrichedChapters = data.chunks.map((chunk) => ({
                 ...chunk,
                 chapter: `Page ${chunk.page_number}`,
               }));
@@ -64,35 +66,28 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
       } else {
         setChapters([]);
       }
+      setStartPage(null);
+      setEndPage(null);
     };
 
     loadChapters();
   }, [subject]);
 
   useEffect(() => {
-    if (selectedChapters.length > 0) {
-      const concatenatedContent = selectedChapters.map(chapterText => {
-        const chapter = chapters.find(c => c.text === chapterText);
-        return chapter?.text || "";
-      }).join("\n\n"); // Join with double newline for separation
+    if (startPage !== null && endPage !== null && chapters.length > 0) {
+      const start = Math.min(startPage, endPage);
+      const end = Math.max(startPage, endPage);
 
-      setSelectedChapterContent(concatenatedContent);
+      const selectedContent = chapters
+        .filter(chapter => chapter.page_number >= start && chapter.page_number <= end)
+        .map(chapter => chapter.text)
+        .join("\n\n");
+
+      setSelectedChapterContent(selectedContent);
     } else {
-      setSelectedChapterContent(""); // Clear content if no chapters are selected
+      setSelectedChapterContent("");
     }
-  }, [selectedChapters, chapters, setSelectedChapterContent]);
-
-  const handleChapterSelect = (chapterText: string) => {
-    setSelectedChapters(prev => {
-      if (prev.includes(chapterText)) {
-        // If already selected, remove it
-        return prev.filter(text => text !== chapterText);
-      } else {
-        // Otherwise, add it to the array
-        return [...prev, chapterText];
-      }
-    });
-  };
+  }, [startPage, endPage, chapters, setSelectedChapterContent]);
 
   return (
     <div className="container mx-auto p-4">
@@ -103,7 +98,7 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
         <CardContent className="grid gap-4">
           <div>
             <Label htmlFor="subject">Subject</Label>
-            <Select onValueChange={setSubject} >
+            <Select onValueChange={setSubject}>
               <SelectTrigger id="subject">
                 <SelectValue placeholder="Select subject" />
               </SelectTrigger>
@@ -116,23 +111,27 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label htmlFor="chapter">Chapter</Label>
-            <Select multiple onValueChange={(values: string[]) => setSelectedChapters(values)}>
-              <SelectTrigger id="chapter" >
-                <SelectValue placeholder="Select chapter(s)" />
-              </SelectTrigger>
-              <SelectContent>
-                {chapters.map((chapter, index) => (
-                  // Use a unique key based on textbook_id and index
-                  chapter.text ? (
-                    <SelectItem key={`${textbooks[subject]}-${index}`} value={chapter.text} >
-                      {chapter.chapter}
-                    </SelectItem>
-                  ) : null
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label htmlFor="startPage">Start Page</Label>
+              <Input
+                type="number"
+                id="startPage"
+                placeholder="Start Page"
+                onChange={(e) => setStartPage(Number(e.target.value))}
+                min="1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="endPage">End Page</Label>
+              <Input
+                type="number"
+                id="endPage"
+                placeholder="End Page"
+                onChange={(e) => setEndPage(Number(e.target.value))}
+                min="1"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

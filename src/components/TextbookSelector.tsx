@@ -118,7 +118,7 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
           </div>
           <div>
             <Label htmlFor="chapter">Chapter</Label>
-            <Select multiple onValueChange={(values: string[]) => setSelectedChapters(values)} defaultValue={selectedChapters}>
+            <Select multiple onValueChange={(values: string[]) => setSelectedChapters(values)} defaultValue={[]}>
               <SelectTrigger id="chapter" >
                 <SelectValue placeholder="Select chapter(s)" />
               </SelectTrigger>

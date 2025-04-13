@@ -22,7 +22,12 @@ const textbooks = {
 
 interface Chapter {
   chapter: string;
-  content: string;
+  text: string;
+}
+
+interface TextbookData {
+  chunks: Chapter[];
+  textbook_id?: string;
 }
 
 const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterContent }) => {
@@ -36,8 +41,13 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
         try {
           const response = await fetch(`/textbooks/${textbooks[subject]}`);
           if (response.ok) {
-            const data: Chapter[] = await response.json();
-            setChapters(data);
+            const data: TextbookData = await response.json();
+            if (Array.isArray(data.chunks)) {
+              setChapters(data.chunks);
+            } else {
+              console.error("Invalid data format: chunks is not an array.");
+              setChapters([]);
+            }
           } else {
             console.error("Failed to load chapter index.");
             setChapters([]);
@@ -56,7 +66,7 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
 
   useEffect(() => {
     if (selectedChapter) {
-      const chapterContent = chapters.find(c => c.chapter === selectedChapter)?.content || "";
+      const chapterContent = chapters.find(c => c.chapter === selectedChapter)?.text || "";
       setSelectedChapterContent(chapterContent);
     }
   }, [selectedChapter, chapters, setSelectedChapterContent]);
@@ -91,7 +101,7 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
               </SelectTrigger>
               <SelectContent>
                 {chapters.map((chapter) => (
-                  <SelectItem key={chapter.chapter} value={chapter.chapter}>
+                  <SelectItem key={chapter.text} value={chapter.text}>
                     {chapter.chapter}
                   </SelectItem>
                 ))}

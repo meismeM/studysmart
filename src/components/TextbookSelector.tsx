@@ -23,6 +23,7 @@ const textbooks = {
 interface Chapter {
   page_number: number;
   text: string;
+  chapter: string;
 }
 
 interface TextbookData {
@@ -107,9 +108,11 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
               <SelectContent>
                 {chapters.map((chapter, index) => (
                   // Use a unique key based on textbook_id and index
-                  <SelectItem key={`${textbooks[subject]}-${index}`} value={chapter.text}>
-                    {chapter.chapter}
-                  </SelectItem>
+                  chapter.text ? (
+                    <SelectItem key={`${textbooks[subject]}-${index}`} value={chapter.text}>
+                      {chapter.chapter}
+                    </SelectItem>
+                  ) : null
                 ))}
               </SelectContent>
             </Select>

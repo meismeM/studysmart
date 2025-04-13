@@ -34,7 +34,7 @@ interface TextbookData {
 const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterContent }) => {
   const [subject, setSubject] = useState("");
   const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [selectedChapter, setSelectedChapter] = useState("");
+  const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
 
   useEffect(() => {
     const loadChapters = async () => {
@@ -44,7 +44,6 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
           if (response.ok) {
             const data: TextbookData = await response.json();
             if (Array.isArray(data.chunks)) {
-              // Map the chunks to add a unique 'chapter' string
               const enrichedChapters = data.chunks.map((chunk, index) => ({
                 ...chunk,
                 chapter: `Page ${chunk.page_number}`,
@@ -71,11 +70,29 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
   }, [subject]);
 
   useEffect(() => {
-    if (selectedChapter) {
-      const chapterContent = chapters.find(c => c.text === selectedChapter)?.text || "";
-      setSelectedChapterContent(chapterContent);
+    if (selectedChapters.length > 0) {
+      const concatenatedContent = selectedChapters.map(chapterText => {
+        const chapter = chapters.find(c => c.text === chapterText);
+        return chapter?.text || "";
+      }).join("\n\n"); // Join with double newline for separation
+
+      setSelectedChapterContent(concatenatedContent);
+    } else {
+      setSelectedChapterContent(""); // Clear content if no chapters are selected
     }
-  }, [selectedChapter, chapters, setSelectedChapterContent]);
+  }, [selectedChapters, chapters, setSelectedChapterContent]);
+
+  const handleChapterSelect = (chapterText: string) => {
+    setSelectedChapters(prev => {
+      if (prev.includes(chapterText)) {
+        // If already selected, remove it
+        return prev.filter(text => text !== chapterText);
+      } else {
+        // Otherwise, add it to the array
+        return [...prev, chapterText];
+      }
+    });
+  };
 
   return (
     <div className="container mx-auto p-4">
@@ -101,15 +118,15 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
           </div>
           <div>
             <Label htmlFor="chapter">Chapter</Label>
-            <Select onValueChange={setSelectedChapter} defaultValue={selectedChapter}>
-              <SelectTrigger id="chapter">
-                <SelectValue placeholder="Select chapter" />
+            <Select multiple onValueChange={(values: string[]) => setSelectedChapters(values)} defaultValue={selectedChapters}>
+              <SelectTrigger id="chapter" >
+                <SelectValue placeholder="Select chapter(s)" />
               </SelectTrigger>
               <SelectContent>
                 {chapters.map((chapter, index) => (
                   // Use a unique key based on textbook_id and index
                   chapter.text ? (
-                    <SelectItem key={`${textbooks[subject]}-${index}`} value={chapter.text}>
+                    <SelectItem key={`${textbooks[subject]}-${index}`} value={chapter.text} >
                       {chapter.chapter}
                     </SelectItem>
                   ) : null

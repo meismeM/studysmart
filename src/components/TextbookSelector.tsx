@@ -103,7 +103,7 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
         <CardContent className="grid gap-4">
           <div>
             <Label htmlFor="subject">Subject</Label>
-            <Select onValueChange={setSubject} defaultValue={subject}>
+            <Select onValueChange={setSubject} >
               <SelectTrigger id="subject">
                 <SelectValue placeholder="Select subject" />
               </SelectTrigger>
@@ -118,7 +118,7 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({ setSelectedChapterC
           </div>
           <div>
             <Label htmlFor="chapter">Chapter</Label>
-            <Select multiple onValueChange={(values: string[]) => setSelectedChapters(values)} defaultValue={[]}>
+            <Select multiple onValueChange={(values: string[]) => setSelectedChapters(values)}>
               <SelectTrigger id="chapter" >
                 <SelectValue placeholder="Select chapter(s)" />
               </SelectTrigger>

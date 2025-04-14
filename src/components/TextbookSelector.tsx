@@ -12,14 +12,14 @@ interface TextbookSelectorProps {
 }
 
 const textbooks = {
-  "biology": "textbooks/biology9_index.json",
-  "chemistry": "textbooks/chemistry9_index.json",
-  "citizenship": "textbooks/citizenship9_index.json",
-  "economics": "textbooks/economics9_index.json",
-  "english": "textbooks/english9_index.json",
-  "geography": "textbooks/geography9_index.json",
-  "history": "textbooks/history9_index.json",
-  "physics": "textbooks/physics9_index.json",
+  "biology9": "Biology",
+  "chemistry9": "Chemistry",
+  "citizenship9": "Citizenship",
+  "economics9": "Economics",
+  "english9": "English",
+  "geography9": "Geography",
+  "history9": "History",
+  "physics9": "Physics",
 };
 
 interface Chapter {
@@ -28,8 +28,8 @@ interface Chapter {
 }
 
 interface TextbookData {
+  textbook_id: string;
   chunks: Chapter[];
-  textbook_id?: string;
 }
 
 const TextbookSelector: React.FC<TextbookSelectorProps> = ({setSelectedChapterContent}) => {
@@ -38,32 +38,40 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({setSelectedChapterCo
   const [startPage, setStartPage] = useState<number | undefined>(undefined);
   const [endPage, setEndPage] = useState<number | undefined>(undefined);
   const { toast } = useToast();
+    const [availableTextbooks, setAvailableTextbooks] = useState<string[]>([]);
+
+    useEffect(() => {
+        const fetchTextbooks = async () => {
+            setAvailableTextbooks(Object.keys(textbooks));
+        };
+        fetchTextbooks();
+    }, []);
 
   const loadChapters = useCallback(async (selectedSubject: string) => {
-    if (selectedSubject && textbooks[selectedSubject]) {
+    if (selectedSubject) {
       try {
-        const response = await fetch(`/${textbooks[selectedSubject]}`);
+        const response = await fetch(`/textbooks/${selectedSubject}_index.json`);
         if (!response.ok) {
           throw new Error(`Failed to fetch textbook data: ${response.status}`);
         }
         const data: TextbookData = await response.json();
-        if (Array.isArray(data.chunks)) {
-          setChapters(data.chunks);
-        } else {
-          console.error("Invalid data format: chunks is not an array.");
-          setChapters([]);
-          toast({
-            title: "Error",
-            description: "Invalid data format in textbook data.",
-            variant: "destructive",
-          });
-        }
+        if (data && Array.isArray(data.chunks)) {
+            setChapters(data.chunks);
+          } else {
+            console.error("Invalid data format: chunks is not an array.");
+            setChapters([]);
+            toast({
+              title: "Error",
+              description: "Invalid data format in textbook data.",
+              variant: "destructive",
+            });
+          }
       } catch (error: any) {
         console.error("Error loading chapter index:", error);
         setChapters([]);
         toast({
           title: "Error",
-          description: `Failed to load textbook data: ${error.message}.  Make sure that the  'public/textbooks' folder contains valid json textbook files`,
+          description: `Failed to load textbook data: ${error.message}.  Make sure that the 'public/textbooks' folder contains valid json textbook files`,
           variant: "destructive",
         });
       }
@@ -115,9 +123,9 @@ const TextbookSelector: React.FC<TextbookSelectorProps> = ({setSelectedChapterCo
                 <SelectValue placeholder="Select subject" />
               </SelectTrigger>
               <SelectContent>
-                {Object.keys(textbooks).map((key) => (
+                {availableTextbooks.map((key) => (
                   <SelectItem key={key} value={key}>
-                    {key.charAt(0).toUpperCase() + key.slice(1)}
+                    {textbooks[key as keyof typeof textbooks]}
                   </SelectItem>
                 ))}
               </SelectContent>

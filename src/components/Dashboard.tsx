@@ -11,15 +11,6 @@ import { generateNotes } from "@/ai/flows/generate-notes";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 
-const subjects = [
-  "Math",
-  "Science",
-  "English",
-  "History",
-  "Geography",
-  "Computer Science",
-];
-
 interface DashboardProps {
   chapterContent: string;
 }
@@ -29,6 +20,7 @@ const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterCon
   const [chapterContent, setChapterContent] = useState(initialChapterContent);
   const [generatedQuestions, setGeneratedQuestions] = useState<string[]>([]);
   const [generatedNotes, setGeneratedNotes] = useState("");
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -104,11 +96,14 @@ const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterCon
                   <SelectValue placeholder="Select subject" />
                 </SelectTrigger>
                 <SelectContent>
-                  {subjects.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
+                  <SelectItem key="biology9" value="biology9">Biology</SelectItem>
+                  <SelectItem key="chemistry9" value="chemistry9">Chemistry</SelectItem>
+                  <SelectItem key="citizenship9" value="citizenship9">Citizenship</SelectItem>
+                  <SelectItem key="economics9" value="economics9">Economics</SelectItem>
+                  <SelectItem key="english9" value="english9">English</SelectItem>
+                  <SelectItem key="geography9" value="geography9">Geography</SelectItem>
+                  <SelectItem key="history9" value="history9">History</SelectItem>
+                  <SelectItem key="physics9" value="physics9">Physics</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -158,7 +153,7 @@ const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterCon
               </CardHeader>
               <CardContent>
                 {generatedNotes ? (
-                  <p>{generatedNotes}</p>
+                  <div dangerouslySetInnerHTML={{ __html: generatedNotes }} />
                 ) : (
                   <p>No notes generated yet.</p>
                 )}

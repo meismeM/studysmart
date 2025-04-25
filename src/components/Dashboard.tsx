@@ -20,7 +20,9 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterContent}) => {
   const [subject, setSubject] = useState("");
   const [chapterContent, setChapterContent] = useState(initialChapterContent);
-  const [generatedQuestions, setGeneratedQuestions] = useState<string[]>([]);
+  const [generatedMCQs, setGeneratedMCQs] = useState<string[]>([]);
+  const [generatedShortAnswers, setGeneratedShortAnswers] = useState<string[]>([]);
+  const [generatedFillBlanks, setGeneratedFillBlanks] = useState<string[]>([]);
   const [generatedNotes, setGeneratedNotes] = useState("");
 
   const {toast} = useToast();
@@ -52,7 +54,19 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
       numberOfQuestions: 5,
     });
 
-    setGeneratedQuestions(result.questions);
+    if (questionType === "multiple-choice") {
+      setGeneratedMCQs(result.questions);
+      setGeneratedShortAnswers([]);
+      setGeneratedFillBlanks([]);
+    } else if (questionType === "short-answer") {
+      setGeneratedShortAnswers(result.questions);
+      setGeneratedMCQs([]);
+      setGeneratedFillBlanks([]);
+    } else {
+      setGeneratedFillBlanks(result.questions);
+      setGeneratedMCQs([]);
+      setGeneratedShortAnswers([]);
+    }
   };
 
   const handleGenerateNotes = async () => {
@@ -154,9 +168,9 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
                       const level = line.indexOf(' ');
                       const tag = `h${level}`;
                       const content = line.substring(level + 1);
-                      return React.createElement(tag, {key: index}, content);
+                      return React.createElement(tag, {key: index, className: 'font-bold text-lg'}, content);
                     } else if (line.startsWith('-')) {
-                      return <li key={index}>{line.substring(1).trim()}</li>;
+                      return <li key={index} className="list-disc list-inside">{line.substring(1).trim()}</li>;
                     } else {
                       return <p key={index}>{line}</p>;
                     }
@@ -174,9 +188,9 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
             <CardTitle>Generated MCQs</CardTitle>
           </CardHeader>
           <CardContent>
-            {generatedQuestions.length > 0 ? (
+            {generatedMCQs.length > 0 ? (
               <ul>
-                {generatedQuestions.map((question, index) => {
+                {generatedMCQs.map((question, index) => {
                   const parts = question.split('\n');
                   const questionText = parts[0];
                   const choices = parts.slice(1);
@@ -184,12 +198,17 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
                     <li key={index} className="mb-2">
                       <p>{questionText}</p>
                       <RadioGroup>
-                        {choices.map((choice, choiceIndex) => (
-                          <div key={choiceIndex} className="ml-4">
-                            <RadioGroupItem value={choice} id={`question-${index}-choice-${choiceIndex}`}/>
-                            <Label htmlFor={`question-${index}-choice-${choiceIndex}`}>{choice}</Label>
-                          </div>
-                        ))}
+                        {choices.map((choice, choiceIndex) => {
+                          const isCorrect = choice.includes('<correct>');
+                          const choiceText = choice.replace('<correct>', '').trim();
+                          return (
+                            <div key={choiceIndex} className="ml-4">
+                            
+                              <RadioGroupItem value={choiceText} id={`question-${index}-choice-${choiceIndex}`}/>
+                              <Label htmlFor={`question-${index}-choice-${choiceIndex}`}>{choiceText}</Label>
+                            </div>
+                          );
+                        })}
                       </RadioGroup>
                     </li>
                   );
@@ -206,9 +225,9 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
             <CardTitle>Generated Short Answer Questions</CardTitle>
           </CardHeader>
           <CardContent>
-            {generatedQuestions.length > 0 ? (
+            {generatedShortAnswers.length > 0 ? (
               <ul>
-                {generatedQuestions.map((question, index) => (
+                {generatedShortAnswers.map((question, index) => (
                   <li key={index} className="mb-2">
                     {question}
                   </li>
@@ -225,9 +244,9 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
             <CardTitle>Generated Fill in the Blanks</CardTitle>
           </CardHeader>
           <CardContent>
-            {generatedQuestions.length > 0 ? (
+            {generatedFillBlanks.length > 0 ? (
               <ul>
-                {generatedQuestions.map((question, index) => (
+                {generatedFillBlanks.map((question, index) => (
                   <li key={index} className="mb-2">
                     {question}
                   </li>

@@ -13,7 +13,7 @@ import {z} from 'genkit';
 const GenerateStudyQuestionsInputSchema = z.object({
   chapterContent: z.string().describe('The content of the textbook chapter.'),
   questionType: z
-    .enum(['multiple-choice', 'short-answer', 'fill-in-the-blank'])
+    .enum(['multiple-choice', 'short-answer', 'fill-in-the-blank', 'true-false'])
     .describe('The type of study questions to generate.'),
   numberOfQuestions: z.number().int().positive().default(5).describe('The number of questions to generate (default is 5).'),
 });
@@ -46,7 +46,7 @@ const prompt = ai.definePrompt({
     schema: z.object({
       chapterContent: z.string().describe('The content of the textbook chapter.'),
       questionType:
-        z.enum(['multiple-choice', 'short-answer', 'fill-in-the-blank'])
+        z.enum(['multiple-choice', 'short-answer', 'fill-in-the-blank', 'true-false'])
           .describe('The type of study questions to generate.'),
       numberOfQuestions: z.number().int().positive()
         .default(5)
@@ -75,6 +75,8 @@ const prompt = ai.definePrompt({
   - Short answer questions should be open-ended and require students to demonstrate their understanding of the material. Provide the answer and explanation if possible.
 
   - Fill-in-the-blank questions should have one or two blanks per sentence, with the missing words indicated by underscores. Provide the answer.
+
+  - True or false questions should test comprehension of key facts. Provide the correct answer.
   
   Output the questions in the following JSON format:
   \`\`\`json
@@ -93,6 +95,10 @@ const prompt = ai.definePrompt({
       {
         "question": "Question with blank(s) indicated by underscores.",
         "answer": "The answer to fill in the blank."
+      },
+      {
+        "question": "Question text",
+        "answer": "true or false"
       }
     ]
   }

@@ -1,28 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { generateStudyQuestions } from "@/ai/flows/generate-study-questions";
-import { generateNotes } from "@/ai/flows/generate-notes";
-import { useToast } from "@/hooks/use-toast";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {useState, useEffect} from "react";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Label} from "@/components/ui/label";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {Button} from "@/components/ui/button";
+import {Textarea} from "@/components/ui/textarea";
+import {generateStudyQuestions} from "@/ai/flows/generate-study-questions";
+import {generateNotes} from "@/ai/flows/generate-notes";
+import {useToast} from "@/hooks/use-toast";
+import {RadioGroup, RadioGroupItem} from "@/components/ui/radio-group";
+import {ScrollArea} from "@/components/ui/scroll-area";
+import React from "react";
 
 interface DashboardProps {
   chapterContent: string;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterContent }) => {
+const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterContent}) => {
   const [subject, setSubject] = useState("");
   const [chapterContent, setChapterContent] = useState(initialChapterContent);
   const [generatedQuestions, setGeneratedQuestions] = useState<string[]>([]);
   const [generatedNotes, setGeneratedNotes] = useState("");
 
-  const { toast } = useToast();
+  const {toast} = useToast();
 
   useEffect(() => {
     setChapterContent(initialChapterContent);
@@ -94,7 +95,7 @@ const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterCon
               <Label htmlFor="subject">Subject</Label>
               <Select onValueChange={setSubject} defaultValue={subject}>
                 <SelectTrigger id="subject">
-                  <SelectValue placeholder="Select subject" />
+                  <SelectValue placeholder="Select subject"/>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem key="biology9" value="biology9">Biology</SelectItem>
@@ -147,20 +148,20 @@ const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterCon
           <CardContent>
             {generatedNotes ? (
               <ScrollArea className="h-[400px] w-full">
-              <div className="whitespace-pre-line" style={{ whiteSpace: 'pre-line' }}>
-                {generatedNotes.split('\n').map((line, index) => {
-                  if (line.startsWith('#')) {
-                    const level = line.indexOf(' ');
-                    const tag = `h${level}`;
-                    const content = line.substring(level + 1);
-                    return React.createElement(tag, { key: index }, content);
-                  } else if (line.startsWith('-')) {
-                    return <li key={index}>{line.substring(1).trim()}</li>;
-                  } else {
-                    return <p key={index}>{line}</p>;
-                  }
-                })}
-              </div>
+                <div className="whitespace-pre-line">
+                  {generatedNotes.split('\n').map((line, index) => {
+                    if (line.startsWith('#')) {
+                      const level = line.indexOf(' ');
+                      const tag = `h${level}`;
+                      const content = line.substring(level + 1);
+                      return React.createElement(tag, {key: index}, content);
+                    } else if (line.startsWith('-')) {
+                      return <li key={index}>{line.substring(1).trim()}</li>;
+                    } else {
+                      return <p key={index}>{line}</p>;
+                    }
+                  })}
+                </div>
               </ScrollArea>
             ) : (
               <p>No notes generated yet.</p>
@@ -168,7 +169,7 @@ const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterCon
           </CardContent>
         </Card>
 
-       <Card className="mt-4">
+        <Card className="mt-4">
           <CardHeader>
             <CardTitle>Generated MCQs</CardTitle>
           </CardHeader>
@@ -185,7 +186,7 @@ const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterCon
                       <RadioGroup>
                         {choices.map((choice, choiceIndex) => (
                           <div key={choiceIndex} className="ml-4">
-                            <RadioGroupItem value={choice} id={`question-${index}-choice-${choiceIndex}`} />
+                            <RadioGroupItem value={choice} id={`question-${index}-choice-${choiceIndex}`}/>
                             <Label htmlFor={`question-${index}-choice-${choiceIndex}`}>{choice}</Label>
                           </div>
                         ))}

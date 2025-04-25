@@ -30,9 +30,9 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
   const [chapterContent, setChapterContent] = useState(initialChapterContent);
   const [generatedQuestions, setGeneratedQuestions] = useState<QuestionType[]>([]);
   const [generatedNotes, setGeneratedNotes] = useState("");
-  const [selectedAnswers, setSelectedAnswers] = useState<{[key: number]: string}>({}); // Track selected answers
-  const [isSubmitted, setIsSubmitted] = useState(false); // Track if the quiz is submitted
-  const [mcqCorrect, setMcqCorrect] = useState<{[key: number]: boolean}>({}); // Track if mcq is correct
+  const [selectedAnswers, setSelectedAnswers] = useState<{[key: number]: string}>({});
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [mcqCorrect, setMcqCorrect] = useState<{[key: number]: boolean}>({});
 
   const {toast} = useToast();
 
@@ -64,9 +64,9 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
     });
 
     setGeneratedQuestions(result.questions);
-    setSelectedAnswers({}); // Reset selected answers
-    setIsSubmitted(false); // Reset submission state
-    setMcqCorrect({}); // Reset correct answers
+    setSelectedAnswers({});
+    setIsSubmitted(false);
+    setMcqCorrect({});
   };
 
   const handleGenerateNotes = async () => {
@@ -99,13 +99,17 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
     setSelectedAnswers(prev => ({...prev, [questionIndex]: answer}));
   };
 
+  const getCorrectAnswerLetter = (correctAnswerIndex: number) => {
+    return String.fromCharCode(65 + correctAnswerIndex);
+  };
+
   const handleSubmit = () => {
     setIsSubmitted(true);
     let tempMcqCorrect: { [key: number]: boolean } = {};
 
     generatedQuestions.forEach((question, index) => {
       if (question.options) {
-        const correctAnswer = question.options[question.correctAnswerIndex!];
+        const correctAnswer = getCorrectAnswerLetter(question.correctAnswerIndex!);
         tempMcqCorrect[index] = selectedAnswers[index] === correctAnswer;
       }
     });
@@ -128,21 +132,24 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
       return (
         <div>
           <RadioGroup onValueChange={(value) => handleAnswerSelection(index, value)} defaultValue={selectedAnswers[index]}>
-            {question.options.map((choice, choiceIndex) => (
-              <div key={choiceIndex} className="ml-4">
-                <RadioGroupItem value={choice} id={`question-${index}-choice-${choiceIndex}`} />
-                <Label htmlFor={`question-${index}-choice-${choiceIndex}`}>{choice}</Label>
-              </div>
-            ))}
+            {question.options.map((choice, choiceIndex) => {
+              const choiceLetter = String.fromCharCode(65 + choiceIndex);
+              return (
+                <div key={choiceIndex} className="ml-4">
+                  <RadioGroupItem value={choiceLetter} id={`question-${index}-choice-${choiceIndex}`} />
+                  <Label htmlFor={`question-${index}-choice-${choiceIndex}`}>{choiceLetter}: {choice}</Label>
+                </div>
+              );
+            })}
           </RadioGroup>
           {isSubmitted && (
             <>
               {selectedAnswers[index] ? (
                 <p className={mcqCorrect[index] ? "text-green-500" : "text-red-500"}>
-                  {mcqCorrect[index] ? "Correct!" : `Incorrect. Correct answer: ${question.options[question.correctAnswerIndex!]}`}
+                  {mcqCorrect[index] ? "Correct!" : `Incorrect. Correct answer: ${getCorrectAnswerLetter(question.correctAnswerIndex!)}`}
                 </p>
               ) : (
-                <p className="text-yellow-500">Not answered. Correct answer: {question.options[question.correctAnswerIndex!]}</p>
+                <p className="text-yellow-500">Not answered. Correct answer: {getCorrectAnswerLetter(question.correctAnswerIndex!)}</p>
               )}
               {!mcqCorrect[index] && (
                 <Button

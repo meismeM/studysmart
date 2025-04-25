@@ -22,7 +22,13 @@ export type GenerateStudyQuestionsInput = z.infer<
 >;
 
 const GenerateStudyQuestionsOutputSchema = z.object({
-  questions: z.array(z.string()).describe('An array of generated study questions.'),
+  questions: z.array(z.object({
+    question: z.string(),
+    answer: z.string().optional(),
+    explanation: z.string().optional(),
+    options: z.array(z.string()).optional(),
+    correctAnswerIndex: z.number().optional(),
+  })).describe('An array of generated study questions.'),
 });
 export type GenerateStudyQuestionsOutput = z.infer<
   typeof GenerateStudyQuestionsOutputSchema
@@ -49,9 +55,13 @@ const prompt = ai.definePrompt({
   },
   output: {
     schema: z.object({
-      questions: z
-        .array(z.string())
-        .describe('An array of generated study questions.'),
+      questions: z.array(z.object({
+        question: z.string(),
+        answer: z.string().optional(),
+        explanation: z.string().optional(),
+        options: z.array(z.string()).optional(),
+        correctAnswerIndex: z.number().optional(),
+      })).describe('An array of generated study questions.'),
     }),
   },
   prompt: `You are an expert educator creating study questions for students.
@@ -60,24 +70,33 @@ const prompt = ai.definePrompt({
 
   Chapter Content: {{{chapterContent}}}
 
-  - Multiple-choice questions should include 4 answer choices, with only one correct answer. Enclose the correct answer with <correct>.
-  - Short answer questions should be open-ended and require students to demonstrate their understanding of the material.
-  - Fill-in-the-blank questions should have one or two blanks per sentence, with the missing words indicated by underscores.
+  - Multiple-choice questions should include 4 answer choices, with only one correct answer. Provide the index of the correct answer.
+
+  - Short answer questions should be open-ended and require students to demonstrate their understanding of the material. Provide the answer and explanation if possible.
+
+  - Fill-in-the-blank questions should have one or two blanks per sentence, with the missing words indicated by underscores. Provide the answer.
   
-  Output the questions in the following format. Each question must be in a new line.
-
-  For Multiple choice questions:
-  1. Question text
-  a) Choice 1
-  b) Choice 2
-  c) Choice 3
-  d) Choice 4 <correct>
-
-  For Short answer questions:
-  1. Question text
-
-  For Fill-in-the-blank questions:
-  1. Question with blank(s) indicated by underscores.
+  Output the questions in the following JSON format:
+  \`\`\`json
+  {
+    "questions": [
+      {
+        "question": "Question text",
+        "options": ["Choice 1", "Choice 2", "Choice 3", "Choice 4"],
+        "correctAnswerIndex": 3
+      },
+      {
+        "question": "Question text",
+        "answer": "The answer.",
+        "explanation": "Explanation of the answer."
+      },
+      {
+        "question": "Question with blank(s) indicated by underscores.",
+        "answer": "The answer to fill in the blank."
+      }
+    ]
+  }
+  \`\`\`
   `,
 });
 

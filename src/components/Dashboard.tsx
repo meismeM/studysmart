@@ -17,13 +17,22 @@ interface DashboardProps {
   chapterContent: string;
 }
 
+type QuestionType = {
+  question: string;
+  answer?: string;
+  explanation?: string;
+  options?: string[];
+  correctAnswerIndex?: number;
+}
+
 const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterContent}) => {
   const [subject, setSubject] = useState("");
   const [chapterContent, setChapterContent] = useState(initialChapterContent);
-  const [generatedMCQs, setGeneratedMCQs] = useState<string[]>([]);
-  const [generatedShortAnswers, setGeneratedShortAnswers] = useState<string[]>([]);
-  const [generatedFillBlanks, setGeneratedFillBlanks] = useState<string[]>([]);
+  const [generatedQuestions, setGeneratedQuestions] = useState<QuestionType[]>([]);
   const [generatedNotes, setGeneratedNotes] = useState("");
+  const [selectedAnswers, setSelectedAnswers] = useState<{[key: number]: string}>({}); // Track selected answers
+  const [isSubmitted, setIsSubmitted] = useState(false); // Track if the quiz is submitted
+  const [mcqCorrect, setMcqCorrect] = useState<{[key: number]: boolean}>({}); // Track if mcq is correct
 
   const {toast} = useToast();
 
@@ -54,19 +63,10 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
       numberOfQuestions: 5,
     });
 
-    if (questionType === "multiple-choice") {
-      setGeneratedMCQs(result.questions);
-      setGeneratedShortAnswers([]);
-      setGeneratedFillBlanks([]);
-    } else if (questionType === "short-answer") {
-      setGeneratedShortAnswers(result.questions);
-      setGeneratedMCQs([]);
-      setGeneratedFillBlanks([]);
-    } else {
-      setGeneratedFillBlanks(result.questions);
-      setGeneratedMCQs([]);
-      setGeneratedShortAnswers([]);
-    }
+    setGeneratedQuestions(result.questions);
+    setSelectedAnswers({}); // Reset selected answers
+    setIsSubmitted(false); // Reset submission state
+    setMcqCorrect({}); // Reset correct answers
   };
 
   const handleGenerateNotes = async () => {
@@ -95,6 +95,57 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
     setGeneratedNotes(result.notes);
   };
 
+  const handleAnswerSelection = (questionIndex: number, answer: string) => {
+    setSelectedAnswers(prev => ({...prev, [questionIndex]: answer}));
+  };
+
+  const handleSubmit = () => {
+    setIsSubmitted(true);
+    const correctAnswers = generatedQuestions.map((question, index) => {
+      return question.options ? question.options[question.correctAnswerIndex!] : undefined;
+    });
+
+    let tempMcqCorrect: { [key: number]: boolean } = {};
+    generatedQuestions.forEach((question, index) => {
+      if (question.options) {
+        tempMcqCorrect[index] = selectedAnswers[index] === question.options[question.correctAnswerIndex!];
+      }
+    });
+    setMcqCorrect(tempMcqCorrect);
+  };
+
+  const renderQuestionContent = (question: QuestionType, index: number) => {
+    if (question.options && question.options.length > 0) {
+      return (
+        <div>
+          <RadioGroup onValueChange={(value) => handleAnswerSelection(index, value)} defaultValue={selectedAnswers[index]}>
+            {question.options.map((choice, choiceIndex) => {
+              return (
+                <div key={choiceIndex} className="ml-4">
+                  <RadioGroupItem value={choice} id={`question-${index}-choice-${choiceIndex}`} />
+                  <Label htmlFor={`question-${index}-choice-${choiceIndex}`}>{choice}</Label>
+                </div>
+              );
+            })}
+          </RadioGroup>
+          {isSubmitted && mcqCorrect[index] !== undefined && (
+            <p className={mcqCorrect[index] ? "text-green-500" : "text-red-500"}>
+              {mcqCorrect[index] ? "Correct!" : `Incorrect. Correct answer: ${question.options[question.correctAnswerIndex!]}`}
+            </p>
+          )}
+        </div>
+      );
+    } else {
+      return (
+        <div>
+          <Button onClick={() => alert(question.answer + (question.explanation ? `\nExplanation: ${question.explanation}` : ''))}>
+            View Answer
+          </Button>
+        </div>
+      );
+    }
+  };
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">StudySmart AI Dashboard</h1>
@@ -102,7 +153,7 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>Chapter Content</CardTitle>
+            <CardTitle>Select Textbook Chapter</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
             <div>
@@ -130,6 +181,7 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
                 placeholder="Chapter content will appear here after selection..."
                 value={chapterContent}
                 readOnly
+                className="min-h-[200px]"
               />
             </div>
           </CardContent>
@@ -162,17 +214,17 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
           <CardContent>
             {generatedNotes ? (
               <ScrollArea className="h-[400px] w-full">
-                <div className="whitespace-pre-line">
+                <div className="whitespace-pre-line p-4">
                   {generatedNotes.split('\n').map((line, index) => {
                     if (line.startsWith('#')) {
                       const level = line.indexOf(' ');
                       const tag = `h${level}`;
                       const content = line.substring(level + 1);
-                      return React.createElement(tag, {key: index, className: 'font-bold text-lg'}, content);
+                      return React.createElement(tag, {key: index, className: 'font-bold text-lg text-blue-700'}, content);
                     } else if (line.startsWith('-')) {
-                      return <li key={index} className="list-disc list-inside">{line.substring(1).trim()}</li>;
+                      return <li key={index} className="list-disc list-inside text-gray-800">{line.substring(1).trim()}</li>;
                     } else {
-                      return <p key={index}>{line}</p>;
+                      return <p key={index} className="text-gray-700">{line}</p>;
                     }
                   })}
                 </div>
@@ -185,75 +237,28 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
 
         <Card className="mt-4">
           <CardHeader>
-            <CardTitle>Generated MCQs</CardTitle>
+            <CardTitle>Generated Questions</CardTitle>
           </CardHeader>
           <CardContent>
-            {generatedMCQs.length > 0 ? (
-              <ul>
-                {generatedMCQs.map((question, index) => {
-                  const parts = question.split('\n');
-                  const questionText = parts[0];
-                  const choices = parts.slice(1);
-                  return (
-                    <li key={index} className="mb-2">
-                      <p>{questionText}</p>
-                      <RadioGroup>
-                        {choices.map((choice, choiceIndex) => {
-                          const isCorrect = choice.includes('<correct>');
-                          const choiceText = choice.replace('<correct>', '').trim();
-                          return (
-                            <div key={choiceIndex} className="ml-4">
-                            
-                              <RadioGroupItem value={choiceText} id={`question-${index}-choice-${choiceIndex}`}/>
-                              <Label htmlFor={`question-${index}-choice-${choiceIndex}`}>{choiceText}</Label>
-                            </div>
-                          );
-                        })}
-                      </RadioGroup>
+            {generatedQuestions.length > 0 ? (
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                handleSubmit();
+              }}>
+                <ul>
+                  {generatedQuestions.map((question, index) => (
+                    <li key={index} className="mb-4 border-b pb-2">
+                      <p className="font-semibold">{question.question}</p>
+                      {renderQuestionContent(question, index)}
                     </li>
-                  );
-                })}
-              </ul>
+                  ))}
+                </ul>
+                <Button type="submit" disabled={isSubmitted}>
+                  {isSubmitted ? "Check Answers" : "Submit"}
+                </Button>
+              </form>
             ) : (
-              <p>No MCQs generated yet.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle>Generated Short Answer Questions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {generatedShortAnswers.length > 0 ? (
-              <ul>
-                {generatedShortAnswers.map((question, index) => (
-                  <li key={index} className="mb-2">
-                    {question}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>No Short Answer questions generated yet.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle>Generated Fill in the Blanks</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {generatedFillBlanks.length > 0 ? (
-              <ul>
-                {generatedFillBlanks.map((question, index) => (
-                  <li key={index} className="mb-2">
-                    {question}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>No Fill in the Blanks questions generated yet.</p>
+              <p>No questions generated yet.</p>
             )}
           </CardContent>
         </Card>

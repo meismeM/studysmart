@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { generateStudyQuestions } from "@/ai/flows/generate-study-questions";
 import { generateNotes } from "@/ai/flows/generate-notes";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 
 interface DashboardProps {
@@ -139,88 +138,77 @@ const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterCon
       </div>
 
       <div className="mt-8">
-        <Tabs defaultValue="notes" className="w-[400px]">
-          <TabsList>
-            <TabsTrigger value="notes">Notes</TabsTrigger>
-            <TabsTrigger value="mcq">MCQs</TabsTrigger>
-            <TabsTrigger value="shortAnswer">Short Answer</TabsTrigger>
-            <TabsTrigger value="fillInTheBlanks">Fill in the Blanks</TabsTrigger>
-          </TabsList>
-          <TabsContent value="notes">
-            <Card>
-              <CardHeader>
-                <CardTitle>Generated Notes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {generatedNotes ? (
-                  <div dangerouslySetInnerHTML={{ __html: generatedNotes }} />
-                ) : (
-                  <p>No notes generated yet.</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="mcq">
-            <Card>
-              <CardHeader>
-                <CardTitle>Generated MCQs</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {generatedQuestions.length > 0 ? (
-                  <ul>
-                    {generatedQuestions.map((question, index) => (
-                      <li key={index} className="mb-2">
-                        {question}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>No MCQs generated yet.</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="shortAnswer">
-            <Card>
-              <CardHeader>
-                <CardTitle>Generated Short Answer Questions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {generatedQuestions.length > 0 ? (
-                  <ul>
-                    {generatedQuestions.map((question, index) => (
-                      <li key={index} className="mb-2">
-                        {question}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>No Short Answer questions generated yet.</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="fillInTheBlanks">
-            <Card>
-              <CardHeader>
-                <CardTitle>Generated Fill in the Blanks</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {generatedQuestions.length > 0 ? (
-                  <ul>
-                    {generatedQuestions.map((question, index) => (
-                      <li key={index} className="mb-2">
-                        {question}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>No Fill in the Blanks questions generated yet.</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        <Card>
+          <CardHeader>
+            <CardTitle>Generated Notes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {generatedNotes ? (
+              <div className="whitespace-pre-line" style={{whiteSpace: 'pre-line'}}>
+                {generatedNotes}
+              </div>
+            ) : (
+              <p>No notes generated yet.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>Generated MCQs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {generatedQuestions.length > 0 ? (
+              <ul>
+                {generatedQuestions.map((question, index) => (
+                  <li key={index} className="mb-2">
+                    {question}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No MCQs generated yet.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>Generated Short Answer Questions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {generatedQuestions.length > 0 ? (
+              <ul>
+                {generatedQuestions.map((question, index) => (
+                  <li key={index} className="mb-2">
+                    {question}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No Short Answer questions generated yet.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>Generated Fill in the Blanks</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {generatedQuestions.length > 0 ? (
+              <ul>
+                {generatedQuestions.map((question, index) => (
+                  <li key={index} className="mb-2">
+                    {question}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No Fill in the Blanks questions generated yet.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

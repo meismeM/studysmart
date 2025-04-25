@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Generates notes for a given chapter of a textbook using AI,
- * formatted with HTML for improved readability.
+ * formatted with Markdown for improved readability and easier styling.
  *
  * - generateNotes - A function that handles the note generation process.
  * - GenerateNotesInput - The input type for the generateNotes function.
@@ -20,8 +20,7 @@ const GenerateNotesInputSchema = z.object({
 export type GenerateNotesInput = z.infer<typeof GenerateNotesInputSchema>;
 
 const GenerateNotesOutputSchema = z.object({
-  notes: z.string().describe('The generated notes for the chapter, formatted with HTML.'),
-  progress: z.string().describe('Progress of the notes generation.'),
+  notes: z.string().describe('The generated notes for the chapter, formatted with Markdown.'),
 });
 export type GenerateNotesOutput = z.infer<typeof GenerateNotesOutputSchema>;
 
@@ -40,16 +39,15 @@ const generateNotesPrompt = ai.definePrompt({
   },
   output: {
     schema: z.object({
-      notes: z.string().describe('The generated notes for the chapter, formatted with HTML.'),
-      progress: z.string().describe('Progress of the notes generation.'),
+      notes: z.string().describe('The generated notes for the chapter, formatted with Markdown.'),
     }),
   },
   prompt: `You are an expert AI assistant designed to generate comprehensive and well-formatted study notes for students.
 
-  You will receive the content of a textbook chapter, the grade level of the student, and the subject. Your task is to create a concise and informative summary of the key concepts, formatted with HTML for improved readability.
+  You will receive the content of a textbook chapter, the grade level of the student, and the subject. Your task is to create a concise and informative summary of the key concepts, formatted with Markdown for improved readability.
 
   Instructions:
-  - Use HTML formatting tags such as <h1>, <h2>, <p>, <ul>, and <li> to structure the notes.
+  - Use Markdown formatting for headings, lists, and emphasis.
   - Ensure the notes are comprehensive, covering all major topics and subtopics in the chapter.
   - Organize the notes logically, with clear headings and subheadings.
   - Use paragraphs for detailed information and lists for key points.
@@ -70,8 +68,5 @@ const generateNotesFlow = ai.defineFlow<
   outputSchema: GenerateNotesOutputSchema,
 }, async input => {
   const {output} = await generateNotesPrompt(input);
-  return {
-    ...output!,
-    progress: 'Generated a summary of the key concepts in note form, formatted with HTML.',
-  };
+  return output!;
 });

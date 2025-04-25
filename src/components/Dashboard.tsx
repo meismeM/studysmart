@@ -40,7 +40,7 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
     setChapterContent(initialChapterContent);
   }, [initialChapterContent]);
 
-  const handleGenerateQuestions = async (questionType: "multiple-choice" | "short-answer" | "fill-in-the-blank") => {
+  const handleGenerateQuestions = async (questionType: "multiple-choice" | "short-answer" | "fill-in-the-blank" | "true-false") => {
     if (!subject) {
       toast({
         title: "Warning",
@@ -101,17 +101,26 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
 
   const handleSubmit = () => {
     setIsSubmitted(true);
-    const correctAnswers = generatedQuestions.map((question, index) => {
-      return question.options ? question.options[question.correctAnswerIndex!] : undefined;
-    });
-
     let tempMcqCorrect: { [key: number]: boolean } = {};
+
     generatedQuestions.forEach((question, index) => {
       if (question.options) {
-        tempMcqCorrect[index] = selectedAnswers[index] === question.options[question.correctAnswerIndex!];
+        const correctAnswer = question.options[question.correctAnswerIndex!];
+        tempMcqCorrect[index] = selectedAnswers[index] === correctAnswer;
       }
     });
+
     setMcqCorrect(tempMcqCorrect);
+  };
+
+  const handleShowAnswer = (question: QuestionType) => {
+    if (question.answer && question.explanation) {
+      alert(`${question.answer}\nExplanation: ${question.explanation}`);
+    } else if (question.answer) {
+      alert(question.answer);
+    } else {
+      alert('No answer or explanation provided for this question.');
+    }
   };
 
   const renderQuestionContent = (question: QuestionType, index: number) => {
@@ -119,26 +128,46 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
       return (
         <div>
           <RadioGroup onValueChange={(value) => handleAnswerSelection(index, value)} defaultValue={selectedAnswers[index]}>
-            {question.options.map((choice, choiceIndex) => {
-              return (
-                <div key={choiceIndex} className="ml-4">
-                  <RadioGroupItem value={choice} id={`question-${index}-choice-${choiceIndex}`} />
-                  <Label htmlFor={`question-${index}-choice-${choiceIndex}`}>{choice}</Label>
-                </div>
-              );
-            })}
+            {question.options.map((choice, choiceIndex) => (
+              <div key={choiceIndex} className="ml-4">
+                <RadioGroupItem value={choice} id={`question-${index}-choice-${choiceIndex}`} />
+                <Label htmlFor={`question-${index}-choice-${choiceIndex}`}>{choice}</Label>
+              </div>
+            ))}
           </RadioGroup>
-          {isSubmitted && mcqCorrect[index] !== undefined && (
-            <p className={mcqCorrect[index] ? "text-green-500" : "text-red-500"}>
-              {mcqCorrect[index] ? "Correct!" : `Incorrect. Correct answer: ${question.options[question.correctAnswerIndex!]}`}
-            </p>
+          {isSubmitted && (
+            <>
+              {selectedAnswers[index] ? (
+                <p className={mcqCorrect[index] ? "text-green-500" : "text-red-500"}>
+                  {mcqCorrect[index] ? "Correct!" : `Incorrect. Correct answer: ${question.options[question.correctAnswerIndex!]}`}
+                </p>
+              ) : (
+                <p className="text-yellow-500">Not answered. Correct answer: {question.options[question.correctAnswerIndex!]}</p>
+              )}
+              {!mcqCorrect[index] && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setIsSubmitted(false);
+                    setSelectedAnswers(prev => {
+                      const newState = {...prev};
+                      delete newState[index];
+                      return newState;
+                    });
+                  }}
+                >
+                  Try Again
+                </Button>
+              )}
+            </>
           )}
         </div>
       );
     } else {
       return (
         <div>
-          <Button onClick={() => alert(question.answer + (question.explanation ? `\nExplanation: ${question.explanation}` : ''))}>
+          <Button onClick={() => handleShowAnswer(question)}>
             View Answer
           </Button>
         </div>
@@ -201,6 +230,9 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
             </Button>
             <Button onClick={() => handleGenerateQuestions("fill-in-the-blank")}>
               Generate Fill-in-the-Blanks
+            </Button>
+             <Button onClick={() => handleGenerateQuestions("true-false")}>
+              Generate True or False Questions
             </Button>
           </CardContent>
         </Card>

@@ -10,11 +10,11 @@
 import {ai} from '@/ai/ai-instance';
 import {z} from 'genkit';
 
+const QuestionTypes = z.enum(['multiple-choice', 'short-answer', 'fill-in-the-blank', 'true-false']);
+
 const GenerateStudyQuestionsInputSchema = z.object({
   chapterContent: z.string().describe('The content of the textbook chapter.'),
-  questionType: z
-    .enum(['multiple-choice', 'short-answer', 'fill-in-the-blank', 'true-false'])
-    .describe('The type of study questions to generate.'),
+  questionType: QuestionTypes.describe('The type of study questions to generate.'),
   numberOfQuestions: z.number().int().positive().default(5).describe('The number of questions to generate (default is 5).'),
 });
 export type GenerateStudyQuestionsInput = z.infer<
@@ -23,11 +23,11 @@ export type GenerateStudyQuestionsInput = z.infer<
 
 const GenerateStudyQuestionsOutputSchema = z.object({
   questions: z.array(z.object({
-    question: z.string(),
-    answer: z.string().optional(),
-    explanation: z.string().optional(),
-    options: z.array(z.string()).optional(),
-    correctAnswerIndex: z.number().optional(),
+    question: z.string().describe('The generated question.'),
+    answer: z.string().optional().describe('The answer to the question (if applicable).'),
+    explanation: z.string().optional().describe('An explanation of the answer (if applicable).'),
+    options: z.array(z.string()).optional().describe('The multiple-choice options (if applicable).'),
+    correctAnswerIndex: z.number().optional().describe('The index of the correct answer in the options array (if applicable).'),
   })).describe('An array of generated study questions.'),
 });
 export type GenerateStudyQuestionsOutput = z.infer<
@@ -56,11 +56,11 @@ const prompt = ai.definePrompt({
   output: {
     schema: z.object({
       questions: z.array(z.object({
-        question: z.string(),
-        answer: z.string().optional(),
-        explanation: z.string().optional(),
-        options: z.array(z.string()).optional(),
-        correctAnswerIndex: z.number().optional(),
+        question: z.string().describe('The generated question.'),
+        answer: z.string().optional().describe('The answer to the question (if applicable).'),
+        explanation: z.string().optional().describe('An explanation of the answer (if applicable).'),
+        options: z.array(z.string()).optional().describe('The multiple-choice options (if applicable).'),
+        correctAnswerIndex: z.number().optional().describe('The index of the correct answer in the options array (if applicable).'),
       })).describe('An array of generated study questions.'),
     }),
   },
@@ -70,13 +70,13 @@ const prompt = ai.definePrompt({
 
   Chapter Content: {{{chapterContent}}}
 
-  - Multiple-choice questions should include 4 answer choices, with only one correct answer. Provide the index of the correct answer.
+  - Multiple-choice questions should include 4 answer choices, with only one correct answer. Provide the index of the correct answer. Provide an explanation why the answer is correct.
 
   - Short answer questions should be open-ended and require students to demonstrate their understanding of the material. Provide the answer and explanation if possible.
 
   - Fill-in-the-blank questions should have one or two blanks per sentence, with the missing words indicated by underscores. Provide the answer.
 
-  - True or false questions should test comprehension of key facts. Provide the correct answer.
+  - True or false questions should test comprehension of key facts. Provide the correct answer and short explanation.
   
   Output the questions in the following JSON format:
   \`\`\`json
@@ -85,7 +85,8 @@ const prompt = ai.definePrompt({
       {
         "question": "Question text",
         "options": ["Choice 1", "Choice 2", "Choice 3", "Choice 4"],
-        "correctAnswerIndex": 3
+        "correctAnswerIndex": 3,
+        "explanation": "Explanation of why this answer is correct."
       },
       {
         "question": "Question text",
@@ -98,7 +99,8 @@ const prompt = ai.definePrompt({
       },
       {
         "question": "Question text",
-        "answer": "true or false"
+        "answer": "true or false",
+        "explanation": "Explanation of why this answer is true or false."
       }
     ]
   }

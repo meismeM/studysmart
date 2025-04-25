@@ -25,7 +25,7 @@ const GenerateStudyQuestionsOutputSchema = z.object({
   questions: z.array(z.object({
     question: z.string().describe('The generated question.'),
     answer: z.string().optional().describe('The answer to the question (if applicable).'),
-    explanation: z.string().optional().describe('An explanation of the answer (if applicable).'),
+    explanation: z.string().optional().describe('A detailed explanation of the answer (if applicable).'),
     options: z.array(z.string()).optional().describe('The multiple-choice options (if applicable).'),
     correctAnswerIndex: z.number().optional().describe('The index of the correct answer in the options array (if applicable).'),
   })).describe('An array of generated study questions.'),
@@ -58,7 +58,7 @@ const prompt = ai.definePrompt({
       questions: z.array(z.object({
         question: z.string().describe('The generated question.'),
         answer: z.string().optional().describe('The answer to the question (if applicable).'),
-        explanation: z.string().optional().describe('An explanation of the answer (if applicable).'),
+        explanation: z.string().optional().describe('A detailed explanation of the answer (if applicable).'),
         options: z.array(z.string()).optional().describe('The multiple-choice options (if applicable).'),
         correctAnswerIndex: z.number().optional().describe('The index of the correct answer in the options array (if applicable).'),
       })).describe('An array of generated study questions.'),
@@ -70,14 +70,16 @@ const prompt = ai.definePrompt({
 
   Chapter Content: {{{chapterContent}}}
 
-  - Multiple-choice questions should include 4 answer choices, with only one correct answer. Provide the index of the correct answer. Provide an explanation why the answer is correct.
+  - Multiple-choice questions should include 4 answer choices, with only one correct answer. Provide the index of the correct answer. Provide a detailed explanation why the answer is correct, referencing the textbook content where possible.
 
-  - Short answer questions should be open-ended and require students to demonstrate their understanding of the material. Provide the answer and explanation if possible.
+  - Short answer questions should be open-ended and require students to demonstrate their understanding of the material. Provide a comprehensive answer and a detailed explanation if possible, referencing the textbook content where possible.
 
   - Fill-in-the-blank questions should have one or two blanks per sentence, with the missing words indicated by underscores. Provide the answer.
 
-  - True or false questions should test comprehension of key facts. Provide the correct answer and short explanation.
+  - True or false questions should test comprehension of key facts. Provide the correct answer (true or false) and a short explanation, referencing the textbook content where possible.
   
+  Ensure all explanations are thorough and easy for a student to understand.
+
   Output the questions in the following JSON format:
   \`\`\`json
   {

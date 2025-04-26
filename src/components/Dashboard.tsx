@@ -9,7 +9,6 @@ import {Textarea} from "@/components/ui/textarea";
 import {generateStudyQuestions} from "@/ai/flows/generate-study-questions";
 import {generateNotes} from "@/ai/flows/generate-notes";
 import {useToast} from "@/hooks/use-toast";
-import {RadioGroup, RadioGroupItem} from "@/components/ui/radio-group";
 import {ScrollArea} from "@/components/ui/scroll-area";
 import React from "react";
 
@@ -30,9 +29,6 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
   const [chapterContent, setChapterContent] = useState(initialChapterContent);
   const [generatedQuestions, setGeneratedQuestions] = useState<QuestionType[]>([]);
   const [generatedNotes, setGeneratedNotes] = useState("");
-  const [selectedAnswers, setSelectedAnswers] = useState<{[key: number]: string}>({});
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [mcqCorrect, setMcqCorrect] = useState<{[key: number]: boolean}>({});
 
   const {toast} = useToast();
 
@@ -60,14 +56,12 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
     const result = await generateStudyQuestions({
       chapterContent: chapterContent,
       questionType,
-      numberOfQuestions: 5,
+      numberOfQuestions: 10,
     });
 
     setGeneratedQuestions(result.questions);
-    setSelectedAnswers({});
-    setIsSubmitted(false);
-    setMcqCorrect({});
   };
+
 
   const handleGenerateNotes = async () => {
     if (!subject) {
@@ -95,114 +89,46 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
     setGeneratedNotes(result.notes);
   };
 
-  const handleAnswerSelection = (questionIndex: number, answer: string) => {
-    setSelectedAnswers(prev => ({...prev, [questionIndex]: answer}));
-  };
-
-  const getCorrectAnswerLetter = (correctAnswerIndex: number | undefined) => {
-    if (correctAnswerIndex === undefined) return "N/A"; // Handle undefined case
-    return String.fromCharCode(65 + correctAnswerIndex);
-  };
-
-  const handleSubmit = (question: QuestionType, index: number) => {
-    setIsSubmitted(true);
-
-    if (question.options) {
-        const correctAnswer = getCorrectAnswerLetter(question.correctAnswerIndex);
-        setMcqCorrect(prev => ({...prev, [index]: selectedAnswers[index] === correctAnswer}));
-    }
-  };
-
-    const handleShowAnswer = (question: QuestionType) => {
-        if (question.answer && question.explanation) {
-            alert(`Answer: ${question.answer}\nExplanation: ${question.explanation}`);
-        } else if (question.answer) {
-            alert(`Answer: ${question.answer}`);
+    const renderQuestionContent = (question: QuestionType, index: number) => {
+        if (question.options && question.options.length > 0) {
+            return (
+                <div>
+                    <ul>
+                        {question.options.map((choice, choiceIndex) => (
+                            <li key={choiceIndex} className="ml-4">
+                                {String.fromCharCode(65 + choiceIndex)}: {choice}
+                            </li>
+                        ))}
+                    </ul>
+                    {question.correctAnswerIndex !== undefined && (
+                        <>
+                            <p className="mt-2">
+                                <strong>Correct Answer:</strong> {String.fromCharCode(65 + question.correctAnswerIndex)}
+                            </p>
+                            {question.explanation && (
+                                <p className="mt-2">
+                                    <strong>Explanation:</strong> {question.explanation}
+                                </p>
+                            )}
+                        </>
+                    )}
+                </div>
+            );
         } else {
-            alert('No answer or explanation provided for this question.');
+            return (
+                <div>
+                    {question.answer && (
+                        <>
+                            <p><strong>Answer:</strong> {question.answer}</p>
+                            {question.explanation && (
+                                <p><strong>Explanation:</strong> {question.explanation}</p>
+                            )}
+                        </>
+                    )}
+                </div>
+            );
         }
     };
-
-  const renderQuestionContent = (question: QuestionType, index: number) => {
-    if (question.options && question.options.length > 0) {
-      return (
-        <div>
-          <RadioGroup onValueChange={(value) => handleAnswerSelection(index, value)} defaultValue={selectedAnswers[index]}>
-            {question.options.map((choice, choiceIndex) => {
-              const choiceLetter = String.fromCharCode(65 + choiceIndex);
-              return (
-                <div key={choiceIndex} className="ml-4">
-                  <RadioGroupItem value={choiceLetter} id={`question-${index}-choice-${choiceIndex}`} disabled={isSubmitted} />
-                  <Label htmlFor={`question-${index}-choice-${choiceIndex}`}>{choiceLetter}: {choice}</Label>
-                </div>
-              );
-            })}
-          </RadioGroup>
-          {isSubmitted && (
-            <>
-              {selectedAnswers[index] ? (
-                <p className={mcqCorrect[index] ? "text-green-500" : "text-red-500"}>
-                  {mcqCorrect[index] ? "Correct!" : `Incorrect. Correct answer: ${getCorrectAnswerLetter(question.correctAnswerIndex)}`}
-                </p>
-              ) : (
-                <p className="text-yellow-500">Not answered. Correct answer: {getCorrectAnswerLetter(question.correctAnswerIndex)}</p>
-              )}
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    setIsSubmitted(false);
-                    setSelectedAnswers(prev => {
-                      const newState = {...prev};
-                      delete newState[index];
-                      return newState;
-                    });
-                    setMcqCorrect(prev => {
-                      const newState = {...prev};
-                      delete newState[index];
-                      return newState;
-                    });
-                  }}
-                  className="mt-2"
-                >
-                  Try Again
-                </Button>
-            </>
-          )}
-        </div>
-      );
-    } else {
-      return (
-        <div>
-          {question.answer && question.explanation && isSubmitted ? (
-             <>
-             <p>Answer: {question.answer}</p>
-             <p>Explanation: {question.explanation}</p>
-               <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    setIsSubmitted(false);
-                    setSelectedAnswers(prev => {
-                      const newState = {...prev};
-                      delete newState[index];
-                      return newState;
-                    });
-                  }}
-                  className="mt-2"
-                >
-                  Try Again
-                </Button>
-             </>
-            ) : (
-              <Button onClick={() => handleShowAnswer(question)} disabled={isSubmitted}>
-                View Answer
-              </Button>
-            )}
-        </div>
-      );
-    }
-  };
 
   return (
     <div className="container mx-auto p-4">
@@ -221,14 +147,30 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
                   <SelectValue placeholder="Select subject" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem key="biology9" value="biology9">Biology</SelectItem>
-                  <SelectItem key="chemistry9" value="chemistry9">Chemistry</SelectItem>
-                  <SelectItem key="citizenship9" value="citizenship9">Citizenship</SelectItem>
-                  <SelectItem key="economics9" value="economics9">Economics</SelectItem>
-                  <SelectItem key="english9" value="english9">English</SelectItem>
-                  <SelectItem key="geography9" value="geography9">Geography</SelectItem>
-                  <SelectItem key="history9" value="history9">History</SelectItem>
-                  <SelectItem key="physics9" value="physics9">Physics</SelectItem>
+                  <SelectItem key="biology9" value="biology9">
+                    Biology
+                  </SelectItem>
+                  <SelectItem key="chemistry9" value="chemistry9">
+                    Chemistry
+                  </SelectItem>
+                  <SelectItem key="citizenship9" value="citizenship9">
+                    Citizenship
+                  </SelectItem>
+                  <SelectItem key="economics9" value="economics9">
+                    Economics
+                  </SelectItem>
+                  <SelectItem key="english9" value="english9">
+                    English
+                  </SelectItem>
+                  <SelectItem key="geography9" value="geography9">
+                    Geography
+                  </SelectItem>
+                  <SelectItem key="history9" value="history9">
+                    History
+                  </SelectItem>
+                  <SelectItem key="physics9" value="physics9">
+                    Physics
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -260,7 +202,7 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
             <Button onClick={() => handleGenerateQuestions("fill-in-the-blank")}>
               Generate Fill-in-the-Blanks
             </Button>
-            <Button onClick={() => handleGenerateQuestions("true-false")}>
+             <Button onClick={() => handleGenerateQuestions("true-false")}>
               Generate True or False Questions
             </Button>
           </CardContent>
@@ -302,24 +244,14 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
           </CardHeader>
           <CardContent>
             {generatedQuestions.length > 0 ? (
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                handleSubmit(generatedQuestions[0], 0);  // This should handle for all
-              }}>
-                <ul>
-                  {generatedQuestions.map((question, index) => (
-                    <li key={index} className="mb-4 border-b pb-2">
-                      <p className="font-semibold">{question.question}</p>
-                      {renderQuestionContent(question, index)}
-                       <Button type="submit" disabled={isSubmitted}
-                      onClick={() => handleSubmit(question, index)}
-                      >
-                          {isSubmitted ? "Check Answers" : "Submit"}
-                        </Button>
-                    </li>
-                  ))}
-                </ul>
-              </form>
+              <ul>
+                {generatedQuestions.map((question, index) => (
+                  <li key={index} className="mb-4 border-b pb-2">
+                    <p className="font-semibold">{question.question}</p>
+                    {renderQuestionContent(question, index)}
+                   </li>
+                ))}
+              </ul>
             ) : (
               <p>No questions generated yet.</p>
             )}

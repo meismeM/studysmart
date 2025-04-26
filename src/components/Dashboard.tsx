@@ -29,6 +29,8 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
   const [chapterContent, setChapterContent] = useState(initialChapterContent);
   const [generatedQuestions, setGeneratedQuestions] = useState<QuestionType[]>([]);
   const [generatedNotes, setGeneratedNotes] = useState("");
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
 
   const {toast} = useToast();
 
@@ -53,13 +55,18 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
       return;
     }
 
-    const result = await generateStudyQuestions({
-      chapterContent: chapterContent,
-      questionType,
-      numberOfQuestions: 10,
-    });
+    setIsGeneratingQuestions(true);
+    try {
+      const result = await generateStudyQuestions({
+        chapterContent: chapterContent,
+        questionType,
+        numberOfQuestions: 10,
+      });
 
-    setGeneratedQuestions(result.questions);
+      setGeneratedQuestions(result.questions);
+    } finally {
+      setIsGeneratingQuestions(false);
+    }
   };
 
 
@@ -80,14 +87,20 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
       return;
     }
 
-    const result = await generateNotes({
-      textbookChapter: chapterContent,
-      gradeLevel: "9th Grade",
-      subject: subject,
-    });
+    setIsGeneratingNotes(true);
+    try {
+      const result = await generateNotes({
+        textbookChapter: chapterContent,
+        gradeLevel: "9th Grade",
+        subject: subject,
+      });
 
-    setGeneratedNotes(result.notes);
+      setGeneratedNotes(result.notes);
+    } finally {
+      setIsGeneratingNotes(false);
+    }
   };
+
 
     const renderQuestionContent = (question: QuestionType, index: number) => {
         if (question.options && question.options.length > 0) {
@@ -171,6 +184,9 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
                   <SelectItem key="physics9" value="physics9">
                     Physics
                   </SelectItem>
+                 <SelectItem key="mathematics9" value="mathematics9">
+                      Mathematics
+                    </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -192,18 +208,20 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
             <CardTitle>Actions</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <Button onClick={handleGenerateNotes}>Generate Notes</Button>
-            <Button onClick={() => handleGenerateQuestions("multiple-choice")}>
-              Generate MCQs
+            <Button onClick={handleGenerateNotes} disabled={isGeneratingNotes}>
+              {isGeneratingNotes ? "Generating Notes..." : "Generate Notes"}
             </Button>
-            <Button onClick={() => handleGenerateQuestions("short-answer")}>
-              Generate Short Answer Questions
+            <Button onClick={() => handleGenerateQuestions("multiple-choice")} disabled={isGeneratingQuestions}>
+              {isGeneratingQuestions ? "Generating MCQs..." : "Generate MCQs"}
             </Button>
-            <Button onClick={() => handleGenerateQuestions("fill-in-the-blank")}>
-              Generate Fill-in-the-Blanks
+            <Button onClick={() => handleGenerateQuestions("short-answer")} disabled={isGeneratingQuestions}>
+              {isGeneratingQuestions ? "Generating Short Answer Questions..." : "Generate Short Answer Questions"}
             </Button>
-             <Button onClick={() => handleGenerateQuestions("true-false")}>
-              Generate True or False Questions
+            <Button onClick={() => handleGenerateQuestions("fill-in-the-blank")} disabled={isGeneratingQuestions}>
+              {isGeneratingQuestions ? "Generating Fill-in-the-Blanks..." : "Generate Fill-in-the-Blanks"}
+            </Button>
+             <Button onClick={() => handleGenerateQuestions("true-false")} disabled={isGeneratingQuestions}>
+              {isGeneratingQuestions ? "Generating True or False Questions..." : "Generate True or False Questions"}
             </Button>
           </CardContent>
         </Card>

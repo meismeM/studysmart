@@ -8,6 +8,10 @@ import { Icons } from "@/components/icons";
 export function ThemeToggle() {
   const { setTheme, theme } = useTheme();
 
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme);
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -21,19 +25,19 @@ export function ThemeToggle() {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" forceMount>
-        <DropdownMenuItem onClick={() => setTheme("light")}>
+        <DropdownMenuItem onClick={() => handleThemeChange("light")}>
           <Icons.light className="mr-2 h-4 w-4"/>
           Light
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
+        <DropdownMenuItem onClick={() => handleThemeChange("dark")}>
           <Icons.dark className="mr-2 h-4 w-4"/>
           Dark
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
+        <DropdownMenuItem onClick={() => handleThemeChange("system")}>
            <Icons.settings className="mr-2 h-4 w-4"/>
           System
         </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setTheme("calm-blue")}>
+          <DropdownMenuItem onClick={() => handleThemeChange("calm-blue")}>
             <span className="mr-2 h-4 w-4 bg-calm-blue rounded-full inline-block"></span>
             Calm Blue
           </DropdownMenuItem>

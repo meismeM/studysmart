@@ -49,7 +49,7 @@ const generateNotesPrompt = ai.definePrompt({
 
   Instructions:
   - **Use Markdown Formatting Extensively:** Employ headings (#, ##, ###), subheadings, bold (\*\***bold**\*\*), italics (\**italics*\*), bullet points (\* or -), numbered lists (1., 2.), and code blocks (\`\`\`) for examples or definitions where appropriate. Use horizontal rules (---) to separate major sections if needed.
-  - **Be Exceptionally Comprehensive:** Cover all major topics and subtopics presented in the chapter content. Provide detailed explanations, definitions, and examples. Do not omit important information.
+  - **Be Exceptionally Comprehensive and Detailed:** Cover all major topics and subtopics presented in the chapter content. Provide thorough explanations, definitions, examples, and context. Do not omit important information. Expand on key points to ensure depth of understanding.
   - **Structure Logically:** Organize the notes with a clear hierarchy using headings and subheadings. Start with main topics and break them down into smaller, digestible sections.
   - **Use Lists Effectively:** Present key points, definitions, steps in a process, or classifications using bulleted or numbered lists for clarity.
   - **Explain Complex Concepts:** Simplify complex ideas using clear language suitable for the specified grade level. Use analogies or examples where helpful.
@@ -110,24 +110,24 @@ const generateNotesPrompt = ai.definePrompt({
 });
 
 
-// Renamed function for clarity
+// Helper function with retry logic
 const generateNotesWithRetry = async (input: GenerateNotesInput, retries = 3, delay = 1000): Promise<{ output: GenerateNotesOutput | null }> => {
   try {
     // Directly await the prompt execution here
     const result = await generateNotesPrompt(input);
     return result; // Return the whole result object which includes 'output'
   } catch (e: any) {
-    // Check if the error is a 503 and retries are available
-    if (retries > 0 && e.message && e.message.includes('503 Service Unavailable')) {
-      console.log(`Retrying generateNotesPrompt in ${delay}ms... (retries remaining: ${retries})`);
+    // Check if the error message exists and includes the 503 status, and if retries are left
+    if (retries > 0 && e.message && (e.message.includes('503 Service Unavailable') || e.message.includes('The model is overloaded'))) {
+      console.warn(`Retrying generateNotesPrompt in ${delay}ms due to 503 error... (retries remaining: ${retries})`);
       // Wait for the specified delay
       await new Promise(resolve => setTimeout(resolve, delay));
-      // Recursive call with decremented retries and increased delay
-      return generateNotesWithRetry(input, retries - 1, delay * 2); // Exponential backoff
+      // Recursive call with decremented retries and increased delay (exponential backoff)
+      return generateNotesWithRetry(input, retries - 1, delay * 2);
     }
     // If it's not a 503 error or retries are exhausted, re-throw the error
     console.error("Error generating notes:", e); // Log the error for debugging
-    throw e;
+    throw e; // Re-throw the original error or a new error indicating failure after retries
   }
 };
 
@@ -141,12 +141,12 @@ const generateNotesFlow = ai.defineFlow<
     outputSchema: GenerateNotesOutputSchema,
   },
   async input => {
-    // Call the renamed retry function
-    const { output } = await generateNotesWithRetry(input);
-    if (!output) {
+    // Call the retry function
+    const result = await generateNotesWithRetry(input);
+    if (!result || !result.output) {
        // Handle the case where retries failed and output is null
       throw new Error("Failed to generate notes after multiple retries.");
     }
-    return output;
+    return result.output;
   }
 );

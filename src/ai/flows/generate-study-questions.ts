@@ -117,17 +117,17 @@ const generateStudyQuestionsWithRetry = async (input: GenerateStudyQuestionsInpu
     const result = await prompt(input);
     return result; // Return the whole result object which includes 'output'
   } catch (e: any) {
-     // Check if the error message exists and includes the 503 status, and if retries are left
-     if (retries > 0 && e.message && (e.message.includes('503 Service Unavailable') || e.message.includes('The model is overloaded'))) {
-        console.warn(`Retrying generateStudyQuestionsPrompt in ${delay}ms due to 503 error... (retries remaining: ${retries})`);
-       // Wait for the specified delay
-       await new Promise(resolve => setTimeout(resolve, delay));
-       // Recursive call with decremented retries and increased delay (exponential backoff)
-       return generateStudyQuestionsWithRetry(input, retries - 1, delay * 2);
-     }
-     // If it's not a 503 error or retries are exhausted, re-throw the error
-     console.error("Error generating study questions:", e); // Log the error for debugging
-     throw e; // Re-throw the original error or a new error indicating failure after retries
+    // Check if the error message exists and includes the 503 or 429 status, and if retries are left
+    if (retries > 0 && e.message && (e.message.includes('503 Service Unavailable') || e.message.includes('The model is overloaded') || e.message.includes('429 Too Many Requests'))) {
+      console.warn(`Retrying generateStudyQuestionsPrompt in ${delay}ms due to 503/429 error... (retries remaining: ${retries})`);
+      // Wait for the specified delay
+      await new Promise(resolve => setTimeout(resolve, delay));
+      // Recursive call with decremented retries and increased delay (exponential backoff)
+      return generateStudyQuestionsWithRetry(input, retries - 1, delay * 2);
+    }
+    // If it's not a 503/429 error or retries are exhausted, re-throw the error
+    console.error("Error generating study questions:", e); // Log the error for debugging
+    throw e; // Re-throw the original error or a new error indicating failure after retries
   }
 };
 

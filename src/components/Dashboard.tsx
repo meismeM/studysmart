@@ -14,22 +14,24 @@ import React from "react";
 
 interface DashboardProps {
   chapterContent: string;
+  subject: string; // Add subject prop
+  grade: string; // Add grade prop
 }
 
 type QuestionType = {
   question: string;
   answer?: string;
-  explanation?: string;
   options?: string[];
   correctAnswerIndex?: number;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterContent}) => {
-  const [subject, setSubject] = useState("");
+const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterContent, subject, grade }) => {
   const [chapterContent, setChapterContent] = useState(initialChapterContent);
   const [generatedQuestions, setGeneratedQuestions] = useState<QuestionType[]>([]);
   const [generatedNotes, setGeneratedNotes] = useState("");
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [noteGenerationMessage, setNoteGenerationMessage] = useState<string | null>(null);
+  const [questionGenerationMessage, setQuestionGenerationMessage] = useState<string | null>(null);
   const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
 
   const {toast} = useToast();
@@ -39,11 +41,14 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
   }, [initialChapterContent]);
 
   const handleGenerateQuestions = async (questionType: "multiple-choice" | "short-answer" | "fill-in-the-blank" | "true-false") => {
+    setQuestionGenerationMessage("Generating questions, please wait...");
     if (!subject) {
       toast({
         title: "Warning",
         description: "Please select a subject.",
+        variant: "destructive",
       });
+       setQuestionGenerationMessage(null);
       return;
     }
 
@@ -51,7 +56,9 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
       toast({
         title: "Warning",
         description: "No chapter content available. Please select a chapter.",
+        variant: "destructive",
       });
+      setQuestionGenerationMessage(null);
       return;
     }
 
@@ -66,16 +73,20 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
       setGeneratedQuestions(result.questions);
     } finally {
       setIsGeneratingQuestions(false);
+       setQuestionGenerationMessage(null);
     }
   };
 
 
   const handleGenerateNotes = async () => {
+     setNoteGenerationMessage("Generating notes, please wait...");
     if (!subject) {
       toast({
         title: "Warning",
         description: "Please select a subject.",
+         variant: "destructive",
       });
+       setNoteGenerationMessage(null);
       return;
     }
 
@@ -83,7 +94,9 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
       toast({
         title: "Warning",
         description: "No chapter content available. Please select a chapter.",
+         variant: "destructive",
       });
+       setNoteGenerationMessage(null);
       return;
     }
 
@@ -91,16 +104,16 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
     try {
       const result = await generateNotes({
         textbookChapter: chapterContent,
-        gradeLevel: "9th Grade",
+        gradeLevel: `${grade}th Grade`, // Use the grade prop
         subject: subject,
       });
 
       setGeneratedNotes(result.notes);
     } finally {
       setIsGeneratingNotes(false);
+       setNoteGenerationMessage(null);
     }
   };
-
 
     const renderQuestionContent = (question: QuestionType, index: number) => {
         if (question.options && question.options.length > 0) {
@@ -113,119 +126,52 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
                             </li>
                         ))}
                     </ul>
-                    {question.correctAnswerIndex !== undefined && (
-                        <>
-                            <p className="mt-2">
-                                <strong>Correct Answer:</strong> {String.fromCharCode(65 + question.correctAnswerIndex)}
-                            </p>
-                            {question.explanation && (
-                                <p className="mt-2">
-                                    <strong>Explanation:</strong> {question.explanation}
-                                </p>
-                            )}
-                        </>
+                   {question.answer && (
+                        <p className="mt-2">
+                            <strong>Correct Answer:</strong> {question.answer}
+                        </p>
                     )}
                 </div>
             );
         } else {
             return (
-                <div>
+                 <div>
                     {question.answer && (
-                        <>
-                            <p><strong>Answer:</strong> {question.answer}</p>
-                            {question.explanation && (
-                                <p><strong>Explanation:</strong> {question.explanation}</p>
-                            )}
-                        </>
+                        <p><strong>Answer:</strong> {question.answer}</p>
                     )}
                 </div>
             );
         }
     };
 
+
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">StudySmart AI Dashboard</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Select Textbook Chapter</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <div>
-              <Label htmlFor="subject">Subject</Label>
-              <Select onValueChange={setSubject} defaultValue={subject}>
-                <SelectTrigger id="subject">
-                  <SelectValue placeholder="Select subject" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem key="biology9" value="biology9">
-                    Biology
-                  </SelectItem>
-                  <SelectItem key="chemistry9" value="chemistry9">
-                    Chemistry
-                  </SelectItem>
-                  <SelectItem key="citizenship9" value="citizenship9">
-                    Citizenship
-                  </SelectItem>
-                  <SelectItem key="economics9" value="economics9">
-                    Economics
-                  </SelectItem>
-                  <SelectItem key="english9" value="english9">
-                    English
-                  </SelectItem>
-                  <SelectItem key="geography9" value="geography9">
-                    Geography
-                  </SelectItem>
-                  <SelectItem key="history9" value="history9">
-                    History
-                  </SelectItem>
-                  <SelectItem key="physics9" value="physics9">
-                    Physics
-                  </SelectItem>
-                 <SelectItem key="mathematics9" value="mathematics9">
-                      Mathematics
-                    </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="chapterContent">Selected Chapter Content</Label>
-              <Textarea
-                id="chapterContent"
-                placeholder="Chapter content will appear here after selection..."
-                value={chapterContent}
-                readOnly
-                className="min-h-[200px]"
-              />
-            </div>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>Actions</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <Button onClick={handleGenerateNotes} disabled={isGeneratingNotes}>
-              {isGeneratingNotes ? "Generating Notes..." : "Generate Notes"}
+             <Button onClick={handleGenerateNotes} disabled={isGeneratingNotes || !!noteGenerationMessage}>
+               {noteGenerationMessage || (isGeneratingNotes ? "Generating Notes..." : "Generate Notes")}
             </Button>
-            <Button onClick={() => handleGenerateQuestions("multiple-choice")} disabled={isGeneratingQuestions}>
-              {isGeneratingQuestions ? "Generating MCQs..." : "Generate MCQs"}
+             <Button onClick={() => handleGenerateQuestions("multiple-choice")} disabled={isGeneratingQuestions || !!questionGenerationMessage}>
+               {questionGenerationMessage || (isGeneratingQuestions ? "Generating MCQs..." : "Generate MCQs")}
             </Button>
-            <Button onClick={() => handleGenerateQuestions("short-answer")} disabled={isGeneratingQuestions}>
-              {isGeneratingQuestions ? "Generating Short Answer Questions..." : "Generate Short Answer Questions"}
+             <Button onClick={() => handleGenerateQuestions("short-answer")} disabled={isGeneratingQuestions || !!questionGenerationMessage}>
+              {questionGenerationMessage || (isGeneratingQuestions ? "Generating Short Answer Questions..." : "Generate Short Answer Questions")}
             </Button>
-            <Button onClick={() => handleGenerateQuestions("fill-in-the-blank")} disabled={isGeneratingQuestions}>
-              {isGeneratingQuestions ? "Generating Fill-in-the-Blanks..." : "Generate Fill-in-the-Blanks"}
+             <Button onClick={() => handleGenerateQuestions("fill-in-the-blank")} disabled={isGeneratingQuestions || !!questionGenerationMessage}>
+               {questionGenerationMessage || (isGeneratingQuestions ? "Generating Fill-in-the-Blanks..." : "Generate Fill-in-the-Blanks")}
             </Button>
-             <Button onClick={() => handleGenerateQuestions("true-false")} disabled={isGeneratingQuestions}>
-              {isGeneratingQuestions ? "Generating True or False Questions..." : "Generate True or False Questions"}
+             <Button onClick={() => handleGenerateQuestions("true-false")} disabled={isGeneratingQuestions || !!questionGenerationMessage}>
+               {questionGenerationMessage || (isGeneratingQuestions ? "Generating True or False Questions..." : "Generate True or False Questions")}
             </Button>
           </CardContent>
         </Card>
-      </div>
+
 
       <div className="mt-8">
         <Card>
@@ -233,19 +179,30 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
             <CardTitle>Generated Notes</CardTitle>
           </CardHeader>
           <CardContent>
-            {generatedNotes ? (
+            {noteGenerationMessage ? (
+              <p>{noteGenerationMessage}</p>
+            ) : generatedNotes ? (
               <ScrollArea className="h-[400px] w-full">
-                <div className="p-4">
-                  {generatedNotes.split('\n').map((line, index) => {
-                    if (line.startsWith('#')) {
-                      const level = line.indexOf(' ');
-                      const tag = `h${level}`;
-                      const content = line.substring(level + 1);
-                      return React.createElement(tag, {key: index, className: 'font-bold text-lg text-blue-700'}, content);
-                    } else if (line.startsWith('-')) {
-                      return <li key={index} className="list-disc list-inside text-gray-800">{line.substring(1).trim()}</li>;
+                <div className="prose dark:prose-invert p-4">
+                   {generatedNotes.split('\n').map((line, index) => {
+                    if (line.startsWith('# ')) {
+                       return <h1 key={index} className="text-2xl font-bold text-primary my-4">{line.substring(2)}</h1>;
+                    } else if (line.startsWith('## ')) {
+                      return <h2 key={index} className="text-xl font-semibold text-primary my-3">{line.substring(3)}</h2>;
+                    } else if (line.startsWith('### ')) {
+                       return <h3 key={index} className="text-lg font-medium text-primary my-2">{line.substring(4)}</h3>;
+                    } else if (line.startsWith('* ') || line.startsWith('- ')) {
+                      return <li key={index} className="ml-4 list-disc text-foreground/80">{line.substring(2)}</li>;
+                    } else if (line.match(/^\d+\.\s/)) {
+                       return <li key={index} className="ml-4 list-decimal text-foreground/80">{line.replace(/^\d+\.\s/, '')}</li>;
+                    } else if (line.startsWith('`') && line.endsWith('`')) {
+                       return <code key={index} className="bg-muted text-muted-foreground p-1 rounded">{line.slice(1, -1)}</code>;
+                     } else if (line.startsWith('**') && line.endsWith('**')) {
+                        return <strong key={index} className="font-bold">{line.slice(2, -2)}</strong>;
+                    } else if (line.startsWith('*') && line.endsWith('*')) {
+                       return <em key={index} className="italic">{line.slice(1, -1)}</em>;
                     } else {
-                      return <p key={index} className="text-gray-700">{line}</p>;
+                      return <p key={index} className="text-foreground/90 my-1">{line}</p>;
                     }
                   })}
                 </div>
@@ -261,15 +218,19 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
             <CardTitle>Generated Questions</CardTitle>
           </CardHeader>
           <CardContent>
-            {generatedQuestions.length > 0 ? (
-              <ul>
-                {generatedQuestions.map((question, index) => (
-                  <li key={index} className="mb-4 border-b pb-2">
-                    <p className="font-semibold">{question.question}</p>
-                    {renderQuestionContent(question, index)}
-                   </li>
-                ))}
-              </ul>
+             {questionGenerationMessage ? (
+              <p>{questionGenerationMessage}</p>
+            ) : generatedQuestions.length > 0 ? (
+              <ScrollArea className="h-[400px] w-full">
+                  <ul>
+                    {generatedQuestions.map((question, index) => (
+                      <li key={index} className="mb-4 border-b pb-2">
+                        <p className="font-semibold">{index + 1}. {question.question}</p>
+                         {renderQuestionContent(question, index)}
+                       </li>
+                    ))}
+                  </ul>
+              </ScrollArea>
             ) : (
               <p>No questions generated yet.</p>
             )}
@@ -281,3 +242,4 @@ const Dashboard: React.FC<DashboardProps> = ({chapterContent: initialChapterCont
 };
 
 export default Dashboard;
+    

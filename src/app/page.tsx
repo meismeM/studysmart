@@ -3,17 +3,27 @@
 import Dashboard from "@/components/Dashboard";
 import TextbookSelector from "@/components/TextbookSelector";
 import { useState } from "react";
-import { ThemeToggle } from "@/components/ThemeToggle";
+
 
 export default function Home() {
   const [selectedChapterContent, setSelectedChapterContent] = useState<string>("");
+   const [selectedSubject, setSelectedSubject] = useState<string>("");
+    const [selectedGrade, setSelectedGrade] = useState<string>("9"); // Default to grade 9
 
   return (
     <>
-       <ThemeToggle />
-      <TextbookSelector setSelectedChapterContent={setSelectedChapterContent} />
-      <Dashboard chapterContent={selectedChapterContent} />
+
+      <TextbookSelector
+        setSelectedChapterContent={setSelectedChapterContent}
+        setSelectedSubject={setSelectedSubject}
+        setSelectedGrade={setSelectedGrade}
+      />
+      <Dashboard
+        chapterContent={selectedChapterContent}
+        subject={selectedSubject}
+        grade={selectedGrade}
+       />
     </>
   );
 }
-
+    

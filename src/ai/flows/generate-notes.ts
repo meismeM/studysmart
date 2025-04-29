@@ -43,26 +43,26 @@ const generateNotesPrompt = ai.definePrompt({
     }),
   },
   prompt: `You are an expert AI assistant designed to generate comprehensive and well-formatted study notes for students. Your goal is to provide high-quality, detailed, and easy-to-understand notes that will help students master the material.
-  You should use markdown extensively to format the notes clearly, making them easy to read and style on a webpage.
+  You should use markdown extensively and appropriately to format the notes clearly, making them easy to read and style on a webpage.
 
   You will receive the content of a textbook chapter, the grade level of the student, and the subject. Your task is to create a detailed and informative summary of the key concepts, formatted with Markdown. The notes should be highly detailed, comprehensive, and well-structured.
 
   Instructions:
-  - **Use Markdown Formatting Extensively:** Employ headings (#, ##, ###), subheadings, bold (\*\***bold**\*\*), italics (\**italics*\*), bullet points (\* or -), numbered lists (1., 2.), and code blocks (\`\`\`) for examples or definitions where appropriate. Use horizontal rules (---) to separate major sections if needed.
+  - **Use Varied Markdown Formatting Appropriately:** Employ headings (#, ##, ###), subheadings, bold (\*\*bold\*\*) for key terms or emphasis, italics (\*italics\*) for definitions or nuanced points, bullet points (\* or -) for lists of items, numbered lists (1., 2.) for sequential steps or ordered items, and code blocks (\`\`\`) for specific examples or definitions where appropriate. Use horizontal rules (---) to separate major sections logically. **Avoid overuse of asterisks (\*) for emphasis; use bold and italics strategically.**
   - **Be Exceptionally Comprehensive and Detailed:** Cover all major topics and subtopics presented in the chapter content. Provide thorough explanations, definitions, examples, and context. Do not omit important information. Expand on key points to ensure depth of understanding.
   - **Structure Logically:** Organize the notes with a clear hierarchy using headings and subheadings. Start with main topics and break them down into smaller, digestible sections.
-  - **Use Lists Effectively:** Present key points, definitions, steps in a process, or classifications using bulleted or numbered lists for clarity.
+  - **Use Lists Effectively:** Present key points, definitions, steps in a process, or classifications using bulleted or numbered lists for clarity and readability.
   - **Explain Complex Concepts:** Simplify complex ideas using clear language suitable for the specified grade level. Use analogies or examples where helpful.
   - **Tailor to Audience:** Ensure the notes are appropriate for a {{gradeLevel}} student studying {{subject}}.
-  - **Enhance Readability:** Use whitespace (empty lines) effectively to separate paragraphs and sections, making the notes easier to scan and read. Ensure good contrast if specifying colors (though standard markdown doesn't support color directly).
+  - **Enhance Readability:** Use whitespace (empty lines) effectively to separate paragraphs and sections, making the notes easier to scan and read.
 
-  Example Notes Structure (Illustrative):
+  Example Notes Structure (Illustrative - Use varied formatting):
 
   # Chapter Title (e.g., Introduction to Biology)
 
   ## 1. What is Biology?
-     - Definition: Biology is the scientific study of life or living things.
-     - Key characteristics of living things:
+     - *Definition:* Biology is the scientific study of life or living things.
+     - **Key characteristics** of living things:
        * Made of cells
        * Require energy
        * Respond to stimuli
@@ -75,37 +75,23 @@ const generateNotesPrompt = ai.definePrompt({
   ## 2. The Scientific Method
      ### Steps:
        1. **Observation:** Noticing something in the natural world.
-       2. **Question:** Asking why or how something happens.
+       2. **Question:** Asking *why* or *how* something happens.
        3. **Hypothesis:** Proposing a testable explanation.
-       4. **Experimentation:** Designing and conducting tests to validate the hypothesis.
-       5. **Analysis:** Interpreting the results of the experiment.
-       6. **Conclusion:** Deciding if the hypothesis is supported or needs modification.
-       7. **Communication:** Sharing findings with others.
+       4. **Experimentation:** Designing and conducting tests.
+       5. **Analysis:** Interpreting results.
+       6. **Conclusion:** Evaluating the hypothesis.
+       7. **Communication:** Sharing findings.
 
      ### Key Terms:
        *  \`Hypothesis\`: A proposed scientific explanation.
        *  \`Variable\`: A factor that can change in an experiment.
-
-  ## 3. Tools of a Biologist
-     ### Laboratory Tools:
-       *  Microscope: Used to view small objects.
-          - \`Magnification\`: How much larger an image appears.
-          - \`Resolution\`: The ability to distinguish between two points.
-       *  Hand lens: Simple magnification tool.
-       *  Autoclave: Sterilizes equipment.
-       *  Incubator: Maintains temperature for cultures.
-       *  Petri dishes: Used for growing microorganisms.
-
-     ### Field Tools:
-       *  Insect nets
-       *  Fishing nets
 
   ---
 
   Textbook Chapter Content:
   {{{textbookChapter}}}
 
-  Generate the detailed Markdown notes below:
+  Generate the detailed Markdown notes below, ensuring varied and appropriate formatting for readability:
   Notes:`,
 });
 

@@ -43,58 +43,94 @@ const generateNotesPrompt = ai.definePrompt({
     }),
   },
   prompt: `You are an expert AI assistant designed to generate comprehensive and well-formatted study notes for students. Your goal is to provide high-quality, detailed, and easy-to-understand notes that will help students master the material.
-You should use markdown.
+  You should use markdown extensively to format the notes clearly, making them easy to read and style on a webpage.
 
-  You will receive the content of a textbook chapter, the grade level of the student, and the subject. Your task is to create a concise and informative summary of the key concepts, formatted with Markdown for improved readability. The notes should be highly detailed and comprehensive, ensuring that no major topics or subtopics are missed.
+  You will receive the content of a textbook chapter, the grade level of the student, and the subject. Your task is to create a detailed and informative summary of the key concepts, formatted with Markdown. The notes should be highly detailed, comprehensive, and well-structured.
 
   Instructions:
-  - Use Markdown formatting extensively for headings, subheadings, lists, emphasis (bold and italics), and code blocks for examples.
-  - The notes must be exceptionally comprehensive, covering all major topics and subtopics in the chapter, with detailed explanations.
-  - Organize the notes logically, with clear headings and subheadings to create a structured and easy-to-follow format.
-  - Use bullet points or numbered lists to present key points, definitions, and formulas. Use examples to help understanding.
-  - Provide detailed explanations of complex concepts, breaking them down into simpler terms.
-  - Ensure the notes are tailored for a {{gradeLevel}} student studying {{subject}}.
+  - **Use Markdown Formatting Extensively:** Employ headings (#, ##, ###), subheadings, bold (\*\***bold**\*\*), italics (\**italics*\*), bullet points (\* or -), numbered lists (1., 2.), and code blocks (\`\`\`) for examples or definitions where appropriate. Use horizontal rules (---) to separate major sections if needed.
+  - **Be Exceptionally Comprehensive:** Cover all major topics and subtopics presented in the chapter content. Provide detailed explanations, definitions, and examples. Do not omit important information.
+  - **Structure Logically:** Organize the notes with a clear hierarchy using headings and subheadings. Start with main topics and break them down into smaller, digestible sections.
+  - **Use Lists Effectively:** Present key points, definitions, steps in a process, or classifications using bulleted or numbered lists for clarity.
+  - **Explain Complex Concepts:** Simplify complex ideas using clear language suitable for the specified grade level. Use analogies or examples where helpful.
+  - **Tailor to Audience:** Ensure the notes are appropriate for a {{gradeLevel}} student studying {{subject}}.
+  - **Enhance Readability:** Use whitespace (empty lines) effectively to separate paragraphs and sections, making the notes easier to scan and read. Ensure good contrast if specifying colors (though standard markdown doesn't support color directly).
 
-  Example Notes Structure:
+  Example Notes Structure (Illustrative):
 
-  # Chapter Title
+  # Chapter Title (e.g., Introduction to Biology)
 
-  ## Key Concepts
-  *  Concept 1: Definition and Explanation
-  *  Concept 2: Definition and Explanation
+  ## 1. What is Biology?
+     - Definition: Biology is the scientific study of life or living things.
+     - Key characteristics of living things:
+       * Made of cells
+       * Require energy
+       * Respond to stimuli
+       * Grow and develop
+       * Reproduce
+       * Excrete waste
+       * Maintain homeostasis
+       * Adapt over time
 
-  ## Important Formulas
-  \`\`\`
-  Formula: Explanation
-  \`\`\`
+  ## 2. The Scientific Method
+     ### Steps:
+       1. **Observation:** Noticing something in the natural world.
+       2. **Question:** Asking why or how something happens.
+       3. **Hypothesis:** Proposing a testable explanation.
+       4. **Experimentation:** Designing and conducting tests to validate the hypothesis.
+       5. **Analysis:** Interpreting the results of the experiment.
+       6. **Conclusion:** Deciding if the hypothesis is supported or needs modification.
+       7. **Communication:** Sharing findings with others.
 
-  ## Key Terms
-  *  Term 1: Definition
-  *  Term 2: Definition
+     ### Key Terms:
+       *  \`Hypothesis\`: A proposed scientific explanation.
+       *  \`Variable\`: A factor that can change in an experiment.
 
-  ## Examples
-  *  Example 1: Explanation
-  *  Example 2: Explanation
+  ## 3. Tools of a Biologist
+     ### Laboratory Tools:
+       *  Microscope: Used to view small objects.
+          - \`Magnification\`: How much larger an image appears.
+          - \`Resolution\`: The ability to distinguish between two points.
+       *  Hand lens: Simple magnification tool.
+       *  Autoclave: Sterilizes equipment.
+       *  Incubator: Maintains temperature for cultures.
+       *  Petri dishes: Used for growing microorganisms.
+
+     ### Field Tools:
+       *  Insect nets
+       *  Fishing nets
+
+  ---
 
   Textbook Chapter Content:
   {{{textbookChapter}}}
 
+  Generate the detailed Markdown notes below:
   Notes:`,
 });
 
-const diagnosePlantWithRetry = async (input: GenerateNotesInput, retries = 3, delay = 1000) => {
+
+// Renamed function for clarity
+const generateNotesWithRetry = async (input: GenerateNotesInput, retries = 3, delay = 1000): Promise<{ output: GenerateNotesOutput | null }> => {
   try {
-    return await generateNotesPrompt(input);
+    // Directly await the prompt execution here
+    const result = await generateNotesPrompt(input);
+    return result; // Return the whole result object which includes 'output'
   } catch (e: any) {
-    if (retries > 0 && e.message.includes('503 Service Unavailable')) {
-      console.log(`Retrying in ${delay}ms ... (retries remaining: ${retries})`);
+    // Check if the error is a 503 and retries are available
+    if (retries > 0 && e.message && e.message.includes('503 Service Unavailable')) {
+      console.log(`Retrying generateNotesPrompt in ${delay}ms... (retries remaining: ${retries})`);
+      // Wait for the specified delay
       await new Promise(resolve => setTimeout(resolve, delay));
-      return diagnosePlantWithRetry(input, retries - 1, delay * 2); // Exponential backoff
+      // Recursive call with decremented retries and increased delay
+      return generateNotesWithRetry(input, retries - 1, delay * 2); // Exponential backoff
     }
+    // If it's not a 503 error or retries are exhausted, re-throw the error
+    console.error("Error generating notes:", e); // Log the error for debugging
     throw e;
   }
 };
-  
+
 const generateNotesFlow = ai.defineFlow<
   typeof GenerateNotesInputSchema,
   typeof GenerateNotesOutputSchema
@@ -105,7 +141,12 @@ const generateNotesFlow = ai.defineFlow<
     outputSchema: GenerateNotesOutputSchema,
   },
   async input => {
-    const {output} = await diagnosePlantWithRetry(input);
-    return output!;
+    // Call the renamed retry function
+    const { output } = await generateNotesWithRetry(input);
+    if (!output) {
+       // Handle the case where retries failed and output is null
+      throw new Error("Failed to generate notes after multiple retries.");
+    }
+    return output;
   }
 );

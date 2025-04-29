@@ -82,6 +82,19 @@ You should use markdown.
   Notes:`,
 });
 
+const diagnosePlantWithRetry = async (input: GenerateNotesInput, retries = 3, delay = 1000) => {
+  try {
+    return await generateNotesPrompt(input);
+  } catch (e: any) {
+    if (retries > 0 && e.message.includes('503 Service Unavailable')) {
+      console.log(`Retrying in ${delay}ms ... (retries remaining: ${retries})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return diagnosePlantWithRetry(input, retries - 1, delay * 2); // Exponential backoff
+    }
+    throw e;
+  }
+};
+  
 const generateNotesFlow = ai.defineFlow<
   typeof GenerateNotesInputSchema,
   typeof GenerateNotesOutputSchema
@@ -92,7 +105,7 @@ const generateNotesFlow = ai.defineFlow<
     outputSchema: GenerateNotesOutputSchema,
   },
   async input => {
-    const {output} = await generateNotesPrompt(input);
+    const {output} = await diagnosePlantWithRetry(input);
     return output!;
   }
 );

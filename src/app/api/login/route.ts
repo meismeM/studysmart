@@ -1,96 +1,71 @@
-// src/app/api/login/route.ts
+// src/app/api/register/route.ts
 
-import { NextResponse, NextRequest } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
-// import bcrypt from 'bcrypt'; // Uncomment for hashing
+import { NextRequest, NextResponse } from 'next/server';
+import { sql } from '@vercel/postgres'; // Import the sql tag
+import bcrypt from 'bcryptjs'; // Use bcryptjs
 
-const usersFilePath = path.join(process.cwd(), 'users.json');
-
-// **ADDED**: Helper function to read users data (consistent with register route)
-async function readUsersFile(): Promise<{ users: any[] } | null> {
-    try {
-        const fileContent = await fs.readFile(usersFilePath, 'utf-8');
-        const usersData = JSON.parse(fileContent);
-        // Validate the basic structure
-        if (usersData && Array.isArray(usersData.users)) {
-            return usersData;
-        } else {
-            console.error("Invalid users.json structure during login read.");
-            // Treat invalid structure same as file not found for security
-            return null;
-        }
-    } catch (error: any) {
-        if (error.code === 'ENOENT') {
-            // File doesn't exist, means no users are registered yet.
-            console.log("users.json not found during login attempt.");
-            return null; // Return null, indicating no users / file doesn't exist
-        } else if (error instanceof SyntaxError) {
-             console.error("Error parsing users.json during login:", error);
-             // Treat invalid JSON same as file not found
-             return null;
-        } else {
-            // Other read errors (permissions, etc.)
-            console.error("Failed to read users.json during login:", error);
-            // Throw an error for unexpected issues
-            throw new Error("Server error reading user data.");
-        }
-    }
-}
-
-
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const { phoneNumber, password } = await request.json();
+    const { phoneNumber, password, fullName, gradeLevel } = await req.json();
 
     // --- Input Validation ---
-    if (!phoneNumber || !password) {
-        return NextResponse.json({ success: false, message: 'Phone number and password are required.' }, { status: 400 });
-    }
-
+    if (!phoneNumber || !password || !fullName || !gradeLevel) { return NextResponse.json({ success: false, message: 'All fields are required.' }, { status: 400 }); }
     const trimmedPhoneNumber = String(phoneNumber).trim();
+    const trimmedFullName = String(fullName).trim();
+    if (!/^(09|07)\d{8}$/.test(trimmedPhoneNumber)) { return NextResponse.json({ success: false, message: 'Invalid phone format (10 digits starting 09 or 07).' }, { status: 400 }); }
+    if (password.length < 6) { return NextResponse.json({ success: false, message: 'Password min 6 characters.' }, { status: 400 }); }
+    if (trimmedFullName.length < 3) { return NextResponse.json({ success: false, message: 'Full name min 3 characters.' }, { status: 400 }); }
+    const allowedGrades = ["9", "10", "11", "12"];
+    if (!allowedGrades.includes(String(gradeLevel))) { return NextResponse.json({ success: false, message: 'Invalid grade level.' }, { status: 400 }); }
 
-    // --- Read User Data ---
-    // **FIXED**: Now calls the helper function
-    const usersData = await readUsersFile();
+    // --- Check for Existing User in DB ---
+    // Use parameterized query to prevent SQL injection
+    const { rows: existingUsers } = await sql`
+      SELECT id FROM users WHERE phone_number = ${trimmedPhoneNumber} LIMIT 1;
+    `;
 
-    // --- Find User ---
-    let user = null;
-    // Check if usersData is not null before trying to find user
-    if (usersData) {
-      user = usersData.users.find((u: { phoneNumber: string }) => u.phoneNumber === trimmedPhoneNumber);
+    if (existingUsers.length > 0) {
+      console.log(`Registration attempt failed: Phone ${trimmedPhoneNumber} already exists.`);
+      return NextResponse.json({ success: false, message: 'Phone number already registered.' }, { status: 409 }); // Conflict
     }
 
-    // If usersData was null (file issue) or user not found in array
-    if (!user) {
-      console.log(`Login attempt failed: User not found for phone number ${trimmedPhoneNumber}.`);
-      return NextResponse.json({ success: false, message: 'Invalid phone number or password.' }, { status: 401 }); // Unauthorized
+    // --- Hash Password ---
+    const saltRounds = 10; // Cost factor for hashing
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    // --- Insert New User into DB ---
+    // Use parameters for all values going into the query
+    const { rows: insertedUsers } = await sql`
+      INSERT INTO users (phone_number, password_hash, full_name, grade_level, is_confirmed)
+      VALUES (${trimmedPhoneNumber}, ${passwordHash}, ${trimmedFullName}, ${String(gradeLevel)}, true) -- Auto-confirm true
+      RETURNING id, phone_number, full_name, grade_level, registered_at; -- Return created user data (excluding hash)
+    `;
+
+    // Ensure insertion worked and data was returned
+    if (!insertedUsers || insertedUsers.length === 0) {
+        throw new Error("User registration failed after insertion attempt.");
     }
+    const newUser = insertedUsers[0];
 
-    // --- Verify Password (!! INSECURE PLACEHOLDER !!) ---
-    const passwordMatches = (password === user.password); // Replace with bcrypt compare!
+    console.log(`User registered: ${newUser.phone_number}, Name: ${newUser.full_name}, Grade: ${newUser.grade_level}`);
 
-    if (passwordMatches) {
-      // NOTE: Check user.isConfirmed in real app
-      console.log(`Login successful for ${trimmedPhoneNumber}`);
-
-      // Return user details (excluding password)
-      const { password: _excludedPassword, ...userData } = user; // Use a different name to avoid scope issues if needed
-
-      return NextResponse.json({
-          success: true,
-          message: 'Login successful',
-          user: userData // Send user data back
-        });
-    } else {
-      console.log(`Login attempt failed: Incorrect password for ${trimmedPhoneNumber}.`);
-      return NextResponse.json({ success: false, message: 'Invalid phone number or password.' }, { status: 401 }); // Unauthorized
-    }
+    return NextResponse.json({
+        success: true,
+        message: 'Registration successful! You are now logged in.',
+        user: newUser // Send back the created user data
+    }, { status: 201 });
 
   } catch (error: any) {
-      // Catch errors from readUsersFile or other unexpected issues
-      console.error('Internal server error during login:', error);
-      return NextResponse.json({ success: false, message: error.message || 'An internal error occurred.' }, { status: 500 });
+    console.error('Error during user registration:', error);
+    // Check for specific database errors (like unique constraint)
+    if (error.message?.includes('duplicate key value violates unique constraint')) {
+         return NextResponse.json({ success: false, message: 'Phone number already registered.' }, { status: 409 });
+    }
+    // Check if the error is from Vercel Postgres connection
+    if (error.message?.includes('missing environment variable')) {
+         console.error("Database connection error: Missing environment variables. Ensure Vercel project is linked and env vars are pulled.");
+         return NextResponse.json({ success: false, message: 'Database configuration error.' }, { status: 500 });
+    }
+    return NextResponse.json({ success: false, message: error.message || 'Internal server error during registration.' }, { status: 500 });
   }
 }
-

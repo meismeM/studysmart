@@ -1,0 +1,108 @@
+{
+  "users": [
+    {
+      "phoneNumber": "0994232510",
+      "password": "123456",
+      "fullName": "Mintesnot Abayneh Negash",
+      "gradeLevel": "12",
+      "isConfirmed": true,
+      "registeredAt": "2025-05-03T20:05:12.537Z"
+    },
+    {
+      "phoneNumber": "0911914664",
+      "password": "netsi1998>27",
+      "fullName": "Netsanet g/tinsae",
+      "gradeLevel": "12",
+      "isConfirmed": true,
+      "registeredAt": "2025-05-03T22:05:32.660Z"
+    },
+    {
+      "phoneNumber": "0986576816",
+      "password": "cheepeter",
+      "fullName": "Changkuoth Wuor Kuich",
+      "gradeLevel": "12",
+      "isConfirmed": true,
+      "registeredAt": "2025-05-03T23:04:52.541Z"
+    },
+    {
+      "phoneNumber": "0916594361",
+      "password": "165900",
+      "fullName": "Asrat Work",
+      "gradeLevel": "12",
+      "isConfirmed": true,
+      "registeredAt": "2025-05-04T00:18:56.216Z"
+    },
+    {
+      "phoneNumber": "0951591783",
+      "password": "sibra@12",
+      "fullName": "Sibra tadese",
+      "gradeLevel": "10",
+      "isConfirmed": true,
+      "registeredAt": "2025-05-04T00:56:00.214Z"
+    },
+    {
+      "phoneNumber": "0943442678",
+      "password": "1@#234",
+      "fullName": "Ram Yahya",
+      "gradeLevel": "9",
+      "isConfirmed": true,
+      "registeredAt": "2025-05-04T04:45:05.259Z"
+    },
+    {
+      "phoneNumber": "0977060494",
+      "password": "@50@omer",
+      "fullName": "Mohammed Semir",
+      "gradeLevel": "10",
+      "isConfirmed": true,
+      "registeredAt": "2025-05-04T04:51:48.959Z"
+    },
+    {
+      "phoneNumber": "0982425082",
+      "password": "Hikuti",
+      "fullName": "HIKMET",
+      "gradeLevel": "12",
+      "isConfirmed": true,
+      "registeredAt": "2025-05-04T05:05:14.534Z"
+    },
+    {
+      "phoneNumber": "0973636756",
+      "password": "20040809",
+      "fullName": "Amansisa udessa",
+      "gradeLevel": "12",
+      "isConfirmed": true,
+      "registeredAt": "2025-05-04T05:43:40.415Z"
+    },
+    {
+      "phoneNumber": "0703813008",
+      "password": "123456",
+      "fullName": "Natnael solomon",
+      "gradeLevel": "9",
+      "isConfirmed": true,
+      "registeredAt": "2025-05-04T08:05:10.292Z"
+    },
+    {
+      "phoneNumber": "0966448944",
+      "password": "Ab2712",
+      "fullName": "Abreham Mengiste",
+      "gradeLevel": "12",
+      "isConfirmed": true,
+      "registeredAt": "2025-05-04T08:48:32.754Z"
+    },
+    {
+      "phoneNumber": "0912877200",
+      "password": "mamaafo123",
+      "fullName": "Mastewal geze",
+      "gradeLevel": "10",
+      "isConfirmed": true,
+      "registeredAt": "2025-05-04T08:55:15.763Z"
+    },
+    {
+      "phoneNumber": "0966387447",
+      "password": "@sanyii",
+      "fullName": "Mosisa Girma",
+      "gradeLevel": "11",
+      "isConfirmed": true,
+      "registeredAt": "2025-05-04T10:03:25.211Z"
+    }
+  ]
+}

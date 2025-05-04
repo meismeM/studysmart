@@ -1,3 +1,5 @@
+// src/components/ui/button.tsx
+
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -40,14 +42,19 @@ export interface ButtonProps
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  // Ensure `children` is destructured here
+  ({ className, variant, size, asChild = false, children, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
     return (
+      // This is line 49 where the error points
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         {...props}
-      />
+      >
+        {/* Ensure `children` is passed here */}
+        {children}
+      </Comp>
     )
   }
 )

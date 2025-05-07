@@ -334,7 +334,16 @@ const Dashboard: React.FC<DashboardProps> = ({
       <ScrollArea className="flex-grow w-full rounded-b-lg border-t dark:border-slate-700">
         <div className="p-5 md:p-8 overflow-auto">
           <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                table: ({ node, ...props }) => (
+                  <div className="overflow-x-auto">
+                    <table {...props} />
+                  </div>
+                ),
+              }}
+            >
               {generatedNotes}
             </ReactMarkdown>
           </div>
@@ -343,6 +352,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     )}
   </CardContent>
 </Card>
+
 
              {/* Questions Card */}
              <Card className="shadow-md dark:shadow-slate-800/50 border border-border/50 flex flex-col min-h-[500px] md:min-h-[600px] lg:min-h-[700px]">

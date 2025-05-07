@@ -300,7 +300,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
          {/* Content Area Grid */}
          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-             {/* Notes Card */}
+{/* Notes Card */}
 <Card className="shadow-md dark:shadow-slate-800/50 border border-border/50 flex flex-col min-h-[500px] md:min-h-[600px] lg:min-h-[700px]">
   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 md:p-6">
     <CardTitle className="text-base md:text-lg flex items-center gap-2">
@@ -332,13 +332,11 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
     ) : (
       <ScrollArea className="flex-grow w-full rounded-b-lg border-t dark:border-slate-700">
-        <div className="p-5 md:p-8">
-          <div className="overflow-x-auto">
-            <div className="whitespace-nowrap prose prose-sm sm:prose-base dark:prose-invert max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {generatedNotes}
-              </ReactMarkdown>
-            </div>
+        <div className="p-5 md:p-8 overflow-auto">
+          <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {generatedNotes}
+            </ReactMarkdown>
           </div>
         </div>
       </ScrollArea>

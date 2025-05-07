@@ -174,23 +174,23 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       const lines = generatedNotes.split('\n');
       const listIndent = margin + 15;
-      let currentFontSize = 10;
-      let currentFontStyle = 'normal';
+      // let currentFontSize = 10; // Removed as not strictly necessary with addStyledText localizing font
+      // let currentFontStyle = 'normal'; // Removed as not strictly necessary
 
       lines.forEach(line => {
           const trimmedLine = line.trim();
-          let consumed = false;
-          currentFontStyle = 'normal';
-          currentFontSize = 10;
+          // let consumed = false; // 'consumed' logic was more for direct doc.text, less for addStyledText
+          // currentFontStyle = 'normal'; // Reset in addStyledText if not passed
+          // currentFontSize = 10; // Reset in addStyledText if not passed
 
-          if (trimmedLine.startsWith('# ')) { yPos = addStyledText(trimmedLine.substring(2), margin, yPos + 5, { fontSize: 16, fontStyle: 'bold' }); consumed = true; }
-          else if (trimmedLine.startsWith('## ')) { yPos = addStyledText(trimmedLine.substring(3), margin, yPos + 4, { fontSize: 14, fontStyle: 'bold' }); consumed = true; }
-          else if (trimmedLine.startsWith('### ')) { yPos = addStyledText(trimmedLine.substring(4), margin, yPos + 3, { fontSize: 12, fontStyle: 'bold' }); consumed = true; }
-          else if (trimmedLine.startsWith('* ') || trimmedLine.startsWith('- ') || trimmedLine.startsWith('+ ')) { const itemText = trimmedLine.substring(2).replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1'); yPos = addStyledText(`• ${itemText}`, listIndent, yPos); consumed = true; }
-          else if (/^\d+\.\s/.test(trimmedLine)) { const itemText = trimmedLine.substring(trimmedLine.indexOf('.') + 1).trim().replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1'); const numPrefix = trimmedLine.substring(0, trimmedLine.indexOf('.') + 1); yPos = addStyledText(`${numPrefix} ${itemText}`, listIndent, yPos); consumed = true; }
-          else if (trimmedLine === '---' || trimmedLine === '***' || trimmedLine === '___') { if (yPos + 15 > Math.min(footerStartY, pageHeight - margin)) { doc.addPage(); yPos = margin; addLogoIfNeeded(); } doc.setLineWidth(0.5); doc.line(margin, yPos + 5, pageWidth - margin, yPos + 5); yPos += 15; consumed = true; }
-          else if (trimmedLine.startsWith('> ')) { yPos = addStyledText(trimmedLine.substring(2), margin + 10, yPos, { fontStyle: 'italic' }); consumed = true; }
-          else if (trimmedLine) { const cleanedLine = trimmedLine.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').replace(/`(.*?)`/g, '"$1"'); yPos = addStyledText(cleanedLine, margin, yPos); consumed = true; }
+          if (trimmedLine.startsWith('# ')) { yPos = addStyledText(trimmedLine.substring(2), margin, yPos + 5, { fontSize: 16, fontStyle: 'bold' }); }
+          else if (trimmedLine.startsWith('## ')) { yPos = addStyledText(trimmedLine.substring(3), margin, yPos + 4, { fontSize: 14, fontStyle: 'bold' }); }
+          else if (trimmedLine.startsWith('### ')) { yPos = addStyledText(trimmedLine.substring(4), margin, yPos + 3, { fontSize: 12, fontStyle: 'bold' }); }
+          else if (trimmedLine.startsWith('* ') || trimmedLine.startsWith('- ') || trimmedLine.startsWith('+ ')) { const itemText = trimmedLine.substring(2).replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1'); yPos = addStyledText(`• ${itemText}`, listIndent, yPos); }
+          else if (/^\d+\.\s/.test(trimmedLine)) { const itemText = trimmedLine.substring(trimmedLine.indexOf('.') + 1).trim().replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1'); const numPrefix = trimmedLine.substring(0, trimmedLine.indexOf('.') + 1); yPos = addStyledText(`${numPrefix} ${itemText}`, listIndent, yPos); }
+          else if (trimmedLine === '---' || trimmedLine === '***' || trimmedLine === '___') { if (yPos + 15 > Math.min(footerStartY, pageHeight - margin)) { doc.addPage(); yPos = margin; addLogoIfNeeded(); } doc.setLineWidth(0.5); doc.line(margin, yPos + 5, pageWidth - margin, yPos + 5); yPos += 15; }
+          else if (trimmedLine.startsWith('> ')) { yPos = addStyledText(trimmedLine.substring(2), margin + 10, yPos, { fontStyle: 'italic' }); }
+          else if (trimmedLine) { const cleanedLine = trimmedLine.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').replace(/`(.*?)`/g, '"$1"'); yPos = addStyledText(cleanedLine, margin, yPos); }
       });
 
       yPos += 10; doc.setLineWidth(0.2);
@@ -282,7 +282,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
          {/* Content Area Grid */}
          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-            {/* Notes Card - MODIFIED FOR HORIZONTAL SCROLL */}
+            {/* Notes Card */}
             <Card className="shadow-md dark:shadow-slate-800/50 border border-border/50 flex flex-col min-h-[500px] md:min-h-[600px] lg:min-h-[700px]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 md:p-6">
                 <CardTitle className="text-base md:text-lg flex items-center gap-2">
@@ -314,17 +314,21 @@ const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 ) : (
                   <ScrollArea className="flex-grow w-full rounded-b-lg border-t dark:border-slate-700">
-                    {/* 1. The div holding the content no longer has its own overflow property,
-                           allowing ScrollArea to manage it. */}
                     <div className="p-5 md:p-8">
                       <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
                             table: ({ node, ...props }) => (
-                              // This ensures individual tables are also scrollable with some styling
+                              // This div provides the horizontal scroll for an individual table if it's too wide.
                               <div className="my-4 overflow-x-auto rounded-md border dark:border-slate-600">
-                                <table {...props} className="min-w-full w-max text-left" />
+                                {/*
+                                  The table itself. 'prose' styles will generally apply width: 100%
+                                  (relative to this scrollable div).
+                                  If table content (cells) are intrinsically wider and cannot wrap
+                                  enough to fit this 100% width, the div's scrollbar will activate.
+                                */}
+                                <table {...props} />
                               </div>
                             ),
                           }}
@@ -333,7 +337,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </ReactMarkdown>
                       </div>
                     </div>
-                    {/* 2. This is the explicitly added horizontal scrollbar for the ScrollArea */}
                     <ScrollBar orientation="horizontal" />
                   </ScrollArea>
                 )}

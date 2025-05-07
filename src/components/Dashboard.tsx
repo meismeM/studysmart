@@ -128,28 +128,23 @@ const Dashboard: React.FC<DashboardProps> = ({
       let yPos = margin;
       const footerStartY = pageHeight - margin - 30; // Start footer content higher up
 
-      // ** FIX: Define logo variables in the outer scope **
       let logoX = 0, logoY = 0, logoWidth = 0, logoHeight = 0;
 
-      // Function to add logo (avoids repetition)
       const addLogoIfNeeded = () => {
            if (logoDataUrl) {
-               // Recalculate position in case of new page
                logoWidth = 30; logoHeight = 30;
                logoX = pageWidth - margin - logoWidth;
-               logoY = margin - 10; // Keep consistent Y position relative to top margin
+               logoY = margin - 10;
                doc.addImage(logoDataUrl!, 'PNG', logoX, logoY, logoWidth, logoHeight);
            }
       }
 
-      // --- Add Logo on First Page (if loaded) ---
-      addLogoIfNeeded(); // Add logo to the first page
+      addLogoIfNeeded();
       if (logoDataUrl) {
-          yPos = Math.max(yPos, (margin - 10) + logoHeight + 5); // Adjust starting yPos if logo was added
+          yPos = Math.max(yPos, (margin - 10) + logoHeight + 5);
       }
 
 
-      // Helper to add text, checking page breaks against footer AND adding logo on new page
       const addStyledText = (text: string, x: number, y: number, options?: any): number => {
           const fontSize = options?.fontSize || 10;
           const fontStyle = options?.fontStyle || 'normal';
@@ -159,37 +154,33 @@ const Dashboard: React.FC<DashboardProps> = ({
           const splitText = doc.splitTextToSize(text, maxLineWidth);
           let newY = y;
           splitText.forEach((line: string) => {
-               // Check if NEXT line would go past footer start area or page bottom
                if (newY + lineHeight > Math.min(footerStartY, pageHeight - margin)) {
                   doc.addPage();
-                  newY = margin; // Reset Y position
-                  addLogoIfNeeded(); // ** Add logo on new page **
-                  // Re-apply font on new page
+                  newY = margin;
+                  addLogoIfNeeded();
                   doc.setFontSize(fontSize);
                   doc.setFont('helvetica', fontStyle);
-                  newY = Math.max(newY, (margin - 10) + logoHeight + 5); // Ensure text starts below logo on new page
+                  newY = Math.max(newY, (margin - 10) + logoHeight + 5);
                }
                doc.text(line, x, newY, options);
                newY += lineHeight;
           });
-           return newY + (fontSize * 0.25); // Return Y pos after adding text + small gap
+           return newY + (fontSize * 0.25);
       };
 
-      // --- Add Title/Header ---
       doc.setFont("helvetica", "bold");
       yPos = addStyledText(`Study Notes: ${subject || 'Unknown'} - Grade ${grade || 'N/A'}`, margin, yPos, { fontSize: 14 });
       doc.setLineWidth(0.5); doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 15;
 
-      // --- ** FIX: Process Markdown Content ** ---
       const lines = generatedNotes.split('\n');
       const listIndent = margin + 15;
-      let currentFontSize = 10; // Reset default font size for content
+      let currentFontSize = 10;
       let currentFontStyle = 'normal';
 
       lines.forEach(line => {
           const trimmedLine = line.trim();
           let consumed = false;
-          currentFontStyle = 'normal'; // Reset style for each line unless overridden
+          currentFontStyle = 'normal';
           currentFontSize = 10;
 
           if (trimmedLine.startsWith('# ')) { yPos = addStyledText(trimmedLine.substring(2), margin, yPos + 5, { fontSize: 16, fontStyle: 'bold' }); consumed = true; }
@@ -200,21 +191,17 @@ const Dashboard: React.FC<DashboardProps> = ({
           else if (trimmedLine === '---' || trimmedLine === '***' || trimmedLine === '___') { if (yPos + 15 > Math.min(footerStartY, pageHeight - margin)) { doc.addPage(); yPos = margin; addLogoIfNeeded(); } doc.setLineWidth(0.5); doc.line(margin, yPos + 5, pageWidth - margin, yPos + 5); yPos += 15; consumed = true; }
           else if (trimmedLine.startsWith('> ')) { yPos = addStyledText(trimmedLine.substring(2), margin + 10, yPos, { fontStyle: 'italic' }); consumed = true; }
           else if (trimmedLine) { const cleanedLine = trimmedLine.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').replace(/`(.*?)`/g, '"$1"'); yPos = addStyledText(cleanedLine, margin, yPos); consumed = true; }
-          // No need for explicit gap add here, addStyledText handles it
       });
 
-      // --- Add Footer Content ---
       yPos += 10; doc.setLineWidth(0.2);
-      if (yPos > footerStartY - 20) { doc.addPage(); yPos = margin; addLogoIfNeeded(); } // Add logo if page break needed for footer line
+      if (yPos > footerStartY - 20) { doc.addPage(); yPos = margin; addLogoIfNeeded(); }
       doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 15;
       doc.setFontSize(8); doc.setFont('helvetica', 'italic');
       if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) { const pageRangeText = `Source Pages (Printed): ${startPage} - ${endPage}`; yPos = addStyledText(pageRangeText, margin, yPos, { fontSize: 8, fontStyle: 'italic' }); yPos += 5; }
       const telegramText = "Join Telegram: https://t.me/grade9to12ethiopia";
-      // Check space for the last line
       if (yPos + 10 > pageHeight - margin) { doc.addPage(); yPos = margin; addLogoIfNeeded();}
       doc.setTextColor(60, 60, 60); doc.text(telegramText, margin, yPos); doc.setTextColor(0, 0, 0);
 
-      // --- Save PDF ---
       const pageRangeString = (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) ? `_p${startPage}-${endPage}` : '';
       const filename = `${subject.replace(/ /g, '_') || 'Notes'}_Grade${grade || 'N_A'}${pageRangeString}_Notes.pdf`;
       doc.save(filename);
@@ -223,7 +210,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     } catch (error) { console.error("Error generating Notes PDF:", error); toast({ title: "PDF Error", description: "Could not generate PDF.", variant: "destructive"}); }
  };
 
- // --- handleDownloadQuestionsPdf (Updated Async + Logo + Footer) ---
  const handleDownloadQuestionsPdf = async () => {
       const questionsToDownload = generatedQuestions[activeQuestionTab]; const currentQuestionTypeTitle = questionTypeTitles[activeQuestionTab];
       if (!questionsToDownload || questionsToDownload.length === 0) { toast({ title: "Cannot Download", description: `No ${currentQuestionTypeTitle} questions generated.`, variant: "destructive"}); return; }
@@ -240,35 +226,31 @@ const Dashboard: React.FC<DashboardProps> = ({
                if (logoDataUrl) { logoWidth = 30; logoHeight = 30; logoX = pageWidth - margin - logoWidth; logoY = margin - 10; doc.addImage(logoDataUrl!, 'PNG', logoX, logoY, logoWidth, logoHeight); }
           }
 
-          addLogoIfNeeded(); // Add logo on first page
+          addLogoIfNeeded();
            if (logoDataUrl) { yPos = Math.max(yPos, (margin - 10) + logoHeight + 5); }
 
           const addText = (text: string | undefined | null, x: number, y: number, options?: any): number => { if (!text || !text.trim()) return y; const questionLineHeight = (options?.fontSize || 10) * 1.2; doc.setFontSize(options?.fontSize || 10); doc.setFont('helvetica', options?.fontStyle || 'normal'); const split = doc.splitTextToSize(text, (options?.maxWidth || maxLineWidth)); let newY = y; split.forEach((line: string) => { if (newY + questionLineHeight > Math.min(footerStartY, pageHeight - margin) ) { doc.addPage(); newY = margin; addLogoIfNeeded(); doc.setFontSize(options?.fontSize || 10); doc.setFont('helvetica', options?.fontStyle || 'normal'); newY = Math.max(newY, (margin - 10) + logoHeight + 5); } doc.text(line, x, newY, options); newY += questionLineHeight; }); return newY + ((options?.fontSize || 10) * 0.25); };
 
-          // --- Add Title/Header ---
           doc.setFont("helvetica", "bold"); yPos = addText(`Practice Questions: ${subject || 'Unknown'} - Grade ${grade || 'N/A'}`, margin, yPos, { fontSize: 14 }); doc.setFontSize(12); doc.setFont("helvetica", "italic"); yPos = addText(`Type: ${currentQuestionTypeTitle}`, margin, yPos); doc.setLineWidth(0.5); doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 15;
 
-          // --- Process Questions ---
           questionsToDownload.forEach((q, index) => {
-              if (yPos > pageHeight - (margin + 60)) { doc.addPage(); yPos = margin; addLogoIfNeeded(); } // Check space
+              if (yPos > pageHeight - (margin + 60)) { doc.addPage(); yPos = margin; addLogoIfNeeded(); }
               doc.setFont("helvetica", "bold"); yPos = addText(`${index + 1}. ${q.question || 'Missing Question Text'}`, margin, yPos, {maxWidth: maxLineWidth}); doc.setFont("helvetica", "normal"); yPos += 5;
-              if (activeQuestionTab === 'multiple-choice' && q.options && q.options.length === 4) { q.options.forEach((opt, optIndex) => { const letter = getCorrectAnswerLetter(optIndex); const cleanedOpt = typeof opt === 'string' ? opt.replace(/✓/g, '').trim() : opt; yPos = addText(`${letter}) ${cleanedOpt || 'Missing Option'}`, margin + 15, yPos, {maxWidth: maxLineWidth - 15}); }); yPos += 5; } // Indent options
+              if (activeQuestionTab === 'multiple-choice' && q.options && q.options.length === 4) { q.options.forEach((opt, optIndex) => { const letter = getCorrectAnswerLetter(optIndex); const cleanedOpt = typeof opt === 'string' ? opt.replace(/✓/g, '').trim() : opt; yPos = addText(`${letter}) ${cleanedOpt || 'Missing Option'}`, margin + 15, yPos, {maxWidth: maxLineWidth - 15}); }); yPos += 5; }
                doc.setFont("helvetica", "italic"); yPos += 2; let answerText = 'Answer: Not provided'; if (activeQuestionTab !== 'multiple-choice' && q.answer) { answerText = `Answer: ${q.answer}`; } else if (activeQuestionTab === 'multiple-choice') { let pdfCorrectLetter = null; if (typeof q.answer === 'string' && /^[A-D]$/i.test(q.answer) && typeof q.correctAnswerIndex === 'number') { pdfCorrectLetter = q.answer.toUpperCase(); } else if (q.options) { const derivedIndex = q.options.findIndex(opt => typeof opt === 'string' && opt.includes('✓')); if (derivedIndex !== -1) { pdfCorrectLetter = getCorrectAnswerLetter(derivedIndex); } } if (pdfCorrectLetter) { answerText = `Correct Answer: ${pdfCorrectLetter}`; } else { answerText = `Correct Answer: Could not determine`; } } yPos = addText(answerText, margin + 15, yPos, {maxWidth: maxLineWidth - 15}); doc.setFont("helvetica", "normal"); yPos += 5;
                if (q.explanation) { doc.setFont("helvetica", "italic"); yPos = addText(`Explanation: ${q.explanation}`, margin + 15, yPos, {maxWidth: maxLineWidth - 15}); doc.setFont("helvetica", "normal"); yPos += 5; }
               yPos += 8; if (index < questionsToDownload.length - 1) { if (yPos > Math.min(footerStartY, pageHeight - margin)) { doc.addPage(); yPos = margin; addLogoIfNeeded();} doc.setLineWidth(0.2); doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 10; } else { yPos += 5; }
           });
 
-          // --- Add Footer Content ---
           yPos += 10; doc.setLineWidth(0.2);
           if (yPos > footerStartY - 20) { doc.addPage(); yPos = margin; addLogoIfNeeded(); }
           doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 15;
           doc.setFontSize(8); doc.setFont('helvetica', 'italic');
           if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) { const pageRangeText = `Source Pages (Printed): ${startPage} - ${endPage}`; yPos = addText(pageRangeText, margin, yPos, { fontSize: 8, fontStyle: 'italic'}); yPos += 5; }
           const telegramText = "Join Telegram: https://t.me/grade9to12ethiopia";
-          if (yPos + 10 > pageHeight - margin) { doc.addPage(); yPos = margin; addLogoIfNeeded();} // Check space for last line
+          if (yPos + 10 > pageHeight - margin) { doc.addPage(); yPos = margin; addLogoIfNeeded();}
           doc.setTextColor(60, 60, 60); doc.text(telegramText, margin, yPos); doc.setTextColor(0, 0, 0);
 
-          // --- Save PDF ---
           const pageRangeString = (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) ? `_p${startPage}-${endPage}` : '';
           const filename = `${subject.replace(/ /g, '_') || 'Questions'}_Grade${grade || 'N_A'}${pageRangeString}_${activeQuestionTab}_Questions.pdf`;
           doc.save(filename);
@@ -298,66 +280,62 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       <Separator className="my-8 md:my-10" />
 
-      {/* Content Area Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-        {/* Notes Card - MODIFIED SECTION */}
-        <Card className="shadow-md dark:shadow-slate-800/50 border border-border/50 flex flex-col min-h-[500px] md:min-h-[600px] lg:min-h-[700px]">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 md:p-6">
-            <CardTitle className="text-base md:text-lg flex items-center gap-2">
-              <FileText className="h-4 w-4 md:h-5 md:w-5 text-primary/80" /> Generated Notes
-            </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownloadNotesPdf}
-              disabled={!generatedNotes.trim() || isGeneratingNotes}
-              title="Download Notes as PDF"
-            >
-              <Download className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-1.5" />
-              <span className="hidden sm:inline">Download </span>PDF
-            </Button>
-          </CardHeader>
+         {/* Content Area Grid */}
+         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+            {/* Notes Card - MODIFIED FOR HORIZONTAL SCROLL */}
+            <Card className="shadow-md dark:shadow-slate-800/50 border border-border/50 flex flex-col min-h-[500px] md:min-h-[600px] lg:min-h-[700px]">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 md:p-6">
+                <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                <FileText className="h-4 w-4 md:h-5 md:w-5 text-primary/80" /> Generated Notes
+                </CardTitle>
+                <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadNotesPdf}
+                disabled={!generatedNotes.trim() || isGeneratingNotes}
+                title="Download Notes as PDF"
+                >
+                <Download className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-1.5" />
+                <span className="hidden sm:inline">Download </span>PDF
+                </Button>
+            </CardHeader>
 
-          <CardContent className="flex-grow flex flex-col p-0">
-            {isGeneratingNotes && !generatedNotes ? (
-              <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
-                <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin mb-4 text-primary" />
-                <p className="text-xs md:text-sm font-medium">{noteGenerationMessage || "Generating notes..."}</p>
-              </div>
-            ) : !generatedNotes.trim() ? (
-              <div className="flex flex-col items-center justify-center flex-grow text-muted-foreground p-6 text-center">
-                <FileText size={48} className="mb-4 opacity-50" />
-                <p className="text-sm font-medium">No Notes Generated</p>
-                <p className="text-xs mt-1">Click "Generate Notes" above or check input.</p>
-              </div>
-            ) : (
-              <ScrollArea className="flex-grow w-full rounded-b-lg border-t dark:border-slate-700">
-                {/* MODIFICATION 1: Removed overflow-auto from this div */}
-                <div className="p-5 md:p-8">
-                  <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        table: ({ node, ...props }) => (
-                          // MODIFICATION 3 (enhancement): Added styling to the table wrapper and table
-                          <div className="my-4 overflow-x-auto rounded-md border dark:border-slate-600">
-                            <table {...props} className="min-w-full w-max text-left" />
-                          </div>
-                        ),
-                      }}
-                    >
-                      {generatedNotes}
-                    </ReactMarkdown>
-                  </div>
+            <CardContent className="flex-grow flex flex-col p-0">
+                {isGeneratingNotes && !generatedNotes ? (
+                <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
+                    <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin mb-4 text-primary" />
+                    <p className="text-xs md:text-sm font-medium">{noteGenerationMessage || "Generating notes..."}</p>
                 </div>
-                {/* MODIFICATION 2: Added horizontal ScrollBar for the ScrollArea */}
-                <ScrollBar orientation="horizontal" />
-                {/* Vertical scrollbar is often handled implicitly by ScrollArea if needed,
-                    but can be explicit too: <ScrollBar orientation="vertical" /> */}
-              </ScrollArea>
-            )}
-          </CardContent>
-        </Card>
+                ) : !generatedNotes.trim() ? (
+                <div className="flex flex-col items-center justify-center flex-grow text-muted-foreground p-6 text-center">
+                    <FileText size={48} className="mb-4 opacity-50" />
+                    <p className="text-sm font-medium">No Notes Generated</p>
+                    <p className="text-xs mt-1">Click "Generate Notes" above or check input.</p>
+                </div>
+                ) : (
+                <ScrollArea className="flex-grow w-full rounded-b-lg border-t dark:border-slate-700">
+                    <div className="p-5 md:p-8"> {/* MODIFICATION 1: Removed overflow-auto */}
+                    <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
+                        <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                            table: ({ node, ...props }) => (
+                                // MODIFICATION 3: Enhanced table wrapper and table styling
+                                <div className="my-4 overflow-x-auto rounded-md border dark:border-slate-600">
+                                <table {...props} className="min-w-full w-max text-left" />
+                                </div>
+                            ),
+                        }}
+                        >
+                        {generatedNotes}
+                        </ReactMarkdown>
+                    </div>
+                    </div>
+                    <ScrollBar orientation="horizontal" /> {/* MODIFICATION 2: Added horizontal ScrollBar */}
+                </ScrollArea>
+                )}
+            </CardContent>
+            </Card>
 
 
              {/* Questions Card */}

@@ -7,9 +7,8 @@ import { Button } from '@/components/ui/button';
 import {
   generateStudyQuestions,
   GenerateStudyQuestionsInput,
-  // GenerateStudyQuestionsOutput, // Not directly used for its type here
 } from '@/ai/flows/generate-study-questions';
-import { generateNotes, /*GenerateNotesOutput*/ } from '@/ai/flows/generate-notes'; // Not directly used
+import { generateNotes } from '@/ai/flows/generate-notes';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { jsPDF } from "jspdf";
@@ -44,9 +43,9 @@ const QUESTION_TYPE_TITLES: Record<CurrentQuestionTypeValue, string> = {
 
 type Question = {
   question: string;
-  answer?: string; // For short-answer, fill-in-the-blank, true-false. For MCQ, can be 'A', 'B' etc. or derived.
-  options?: string[]; // For multiple-choice
-  correctAnswerIndex?: number; // For multiple-choice (0-indexed)
+  answer?: string;
+  options?: string[];
+  correctAnswerIndex?: number;
   explanation?: string;
 };
 
@@ -146,7 +145,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     setActiveQuestionTab('multiple-choice');
   }, [
     initialChapterContent,
-    subject, // Added subject and grade as dependencies for full reset
+    subject,
     grade,
     initialQuestionState,
     initialLoadingState,
@@ -157,7 +156,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   // === UI Interaction Helpers ===
   const getCorrectAnswerLetter = useCallback((index?: number): string | null => {
     if (typeof index !== 'number' || index < 0 || index > 3) return null;
-    return String.fromCharCode(65 + index); // A, B, C, D
+    return String.fromCharCode(65 + index);
   }, []);
 
   const toggleShowAnswer = useCallback(
@@ -203,13 +202,12 @@ const Dashboard: React.FC<DashboardProps> = ({
   const renderInlineFormatting = useCallback((text: string | null | undefined): string => {
     if (!text) return '';
     let html = text;
-    // Basic Markdown to HTML conversion for bold, italic, code, and blanks
-    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'); // Bold
-    html = html.replace(/__(.*?)__/g, '<strong>$1</strong>'); // Bold (alternative)
-    html = html.replace(/(?<!\w)\*(?!\s)(.+?)(?<!\s)\*(?!\w)/g, '<em>$1</em>'); // Italic
-    html = html.replace(/(?<!\w)_(?!\s)(.+?)(?<!\s)_(?!\w)/g, '<em>$1</em>'); // Italic (alternative)
-    html = html.replace(/`(.*?)`/g, '<code class="bg-muted text-muted-foreground px-1 py-0.5 rounded font-mono text-sm">$1</code>'); // Inline code
-    html = html.replace(/__+/g, '<span class="italic text-muted-foreground">[blank]</span>'); // Fill-in-the-blank marker
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+    html = html.replace(/(?<!\w)\*(?!\s)(.+?)(?<!\s)\*(?!\w)/g, '<em>$1</em>');
+    html = html.replace(/(?<!\w)_(?!\s)(.+?)(?<!\s)_(?!\w)/g, '<em>$1</em>');
+    html = html.replace(/`(.*?)`/g, '<code class="bg-muted text-muted-foreground px-1 py-0.5 rounded font-mono text-sm">$1</code>');
+    html = html.replace(/__+/g, '<span class="italic text-muted-foreground">[blank]</span>');
     return html;
   }, []);
 
@@ -226,19 +224,16 @@ const Dashboard: React.FC<DashboardProps> = ({
     let displayCorrectLetter: string | null = null;
     let isDerivedFromSymbol = false;
 
-    // Clean options by removing any '✓' symbols
     const cleanedOptions = rawOptions.map(opt =>
       typeof opt === 'string' ? opt.replace(/✓/g, '').trim() : String(opt)
     );
 
-    // Priority 1: Explicit correctAnswerIndex
     if (typeof question.correctAnswerIndex === 'number' &&
         question.correctAnswerIndex >= 0 &&
         question.correctAnswerIndex < cleanedOptions.length) {
       finalCorrectIndex = question.correctAnswerIndex;
       displayCorrectLetter = getCorrectAnswerLetter(finalCorrectIndex);
     }
-    // Priority 2: Explicit answer letter (A-D)
     else if (typeof question.answer === 'string' && /^[A-D]$/i.test(question.answer)) {
       const letterIndex = question.answer.toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
       if (letterIndex >= 0 && letterIndex < cleanedOptions.length) {
@@ -247,7 +242,6 @@ const Dashboard: React.FC<DashboardProps> = ({
       }
     }
 
-    // Priority 3: Check for '✓' symbol in original options if no explicit answer found yet
     if (finalCorrectIndex === null) {
       const symbolIndex = rawOptions.findIndex(opt => typeof opt === 'string' && opt.includes('✓'));
       if (symbolIndex !== -1 && symbolIndex < cleanedOptions.length) {
@@ -361,7 +355,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             {isShowingAnswer && <AnswerRevealComponent displayLetter={displayCorrectLetter} derivedFromSymbol={isDerivedFromSymbol} />}
           </div>
         );
-      } else { // For Short Answer, Fill-in-the-blank, True/False
+      } else {
         return (
           <div className="mt-2 md:mt-3">
             <RevealButtonComponent />
@@ -409,7 +403,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     if (!validateInputs()) return;
     const typeTitle = QUESTION_TYPE_TITLES[questionType];
 
-    // Reset state for this specific question type
     setGeneratedQuestions(prev => ({ ...prev, [questionType]: [] }));
     setShowAnswer(prev => ({ ...prev, [questionType]: {} }));
     setIsGeneratingQuestions(prev => ({ ...prev, [questionType]: true }));
@@ -429,7 +422,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       if (result?.questions && Array.isArray(result.questions)) {
         const questionsReceived = result.questions as Question[];
-        //  AI might return 0 questions if content is too short or unsuitable. This is not an error.
         if (questionsReceived.length > 0) {
           toast({ title: "Success!", description: `${questionsReceived.length} ${typeTitle} questions generated.` });
         } else {
@@ -443,328 +435,309 @@ const Dashboard: React.FC<DashboardProps> = ({
       const msg = error.message || `An unknown error occurred while generating ${typeTitle} questions.`;
       toast({ title: "Question Generation Error", description: msg, variant: "destructive" });
       setComponentError(msg);
-      setGeneratedQuestions(prev => ({ ...prev, [questionType]: [] })); // Ensure it's an empty array on error
+      setGeneratedQuestions(prev => ({ ...prev, [questionType]: [] }));
     } finally {
       setIsGeneratingQuestions(prev => ({ ...prev, [questionType]: false }));
       setQuestionGenerationMessage(prev => ({ ...prev, [questionType]: null }));
     }
   };
 
-  // === PDF Generation Shared Utilities ===
-  const PDF_SETTINGS = {
-    MARGIN: 40,
-    LOGO_WIDTH: 30,
-    LOGO_HEIGHT: 30,
-    FOOTER_RESERVED_HEIGHT: 50, // Increased slightly for more buffer
-  };
+  // === PDF Download Handlers (Reverted to Original Working Logic) ===
 
-  type PdfContext = {
-    doc: jsPDF;
-    yPos: number;
-    pageWidth: number;
-    pageHeight: number;
-    maxLineWidth: number;
-    footerStartY: number; // The Y coordinate where main content should stop to leave space for footer
-    logoDataUrl: string | null;
-  };
-
-  const initializePdf = async (): Promise<PdfContext> => {
-    const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
-    const pageWidth = doc.internal.pageSize.width;
-    const pageHeight = doc.internal.pageSize.height;
-    let logoDataUrl: string | null = null;
-    try {
-      logoDataUrl = await loadImageData('/logo.png');
-    } catch (imgError: any) {
-      console.warn("Could not load logo for PDF:", imgError.message);
-    }
-    return {
-      doc,
-      yPos: PDF_SETTINGS.MARGIN,
-      pageWidth,
-      pageHeight,
-      maxLineWidth: pageWidth - PDF_SETTINGS.MARGIN * 2,
-      // footerStartY is where content drawing should ideally stop to make room for the footer.
-      footerStartY: pageHeight - PDF_SETTINGS.MARGIN - PDF_SETTINGS.FOOTER_RESERVED_HEIGHT,
-      logoDataUrl,
-    };
-  };
-
-  const addLogoToPdfPage = (ctx: PdfContext) => {
-    if (ctx.logoDataUrl) {
-      const logoX = ctx.pageWidth - PDF_SETTINGS.MARGIN - PDF_SETTINGS.LOGO_WIDTH;
-      const logoY = PDF_SETTINGS.MARGIN - 10; // Slightly above top margin
-      ctx.doc.addImage(ctx.logoDataUrl, 'PNG', logoX, logoY, PDF_SETTINGS.LOGO_WIDTH, PDF_SETTINGS.LOGO_HEIGHT);
-      
-      // If yPos is at the top margin (e.g., new page), ensure it's pushed below the logo.
-      if (ctx.yPos === PDF_SETTINGS.MARGIN) {
-         ctx.yPos = Math.max(ctx.yPos, logoY + PDF_SETTINGS.LOGO_HEIGHT + 10); // +10 for padding below logo
-      }
-    }
-  };
-  
-  const addTextToPdf = (
-    ctx: PdfContext,
-    text: string,
-    x: number,
-    options: {
-      fontSize?: number;
-      fontStyle?: 'normal' | 'bold' | 'italic' | 'bolditalic';
-      maxWidth?: number;
-      color?: [number, number, number] | string;
-      lineHeightFactor?: number;
-    } = {}
-  ): void => {
-    if (!text || !text.trim()) return;
-  
-    const fontSize = options.fontSize || 10;
-    const fontStyle = options.fontStyle || 'normal';
-    const currentMaxWidth = options.maxWidth || ctx.maxLineWidth; // Use a different name or ctx directly
-    const lineHeight = fontSize * (options.lineHeightFactor || 1.2);
-  
-    ctx.doc.setFontSize(fontSize);
-    ctx.doc.setFont('helvetica', fontStyle);
-    const originalColor = ctx.doc.getTextColor(); // Store original color
-
-    if (options.color) {
-      if (Array.isArray(options.color)) ctx.doc.setTextColor(options.color[0], options.color[1], options.color[2]);
-      else ctx.doc.setTextColor(options.color as string);
-    } else {
-      ctx.doc.setTextColor(0, 0, 0); // Default to black
-    }
-  
-    const splitText = ctx.doc.splitTextToSize(text, currentMaxWidth);
-  
-    splitText.forEach((line: string) => {
-      // Check if NEXT line would go past the calculated footerStartY
-      if (ctx.yPos + lineHeight > ctx.footerStartY) {
-        ctx.doc.addPage();
-        ctx.yPos = PDF_SETTINGS.MARGIN; // Reset Y for new page
-        addLogoToPdfPage(ctx);        // Add logo, which might adjust yPos further
-        
-        // Re-apply font settings on new page
-        ctx.doc.setFontSize(fontSize);
-        ctx.doc.setFont('helvetica', fontStyle);
-        if (options.color) {
-          if (Array.isArray(options.color)) ctx.doc.setTextColor(options.color[0], options.color[1], options.color[2]);
-          else ctx.doc.setTextColor(options.color as string);
-        } else {
-            ctx.doc.setTextColor(0,0,0);
-        }
-      }
-      ctx.doc.text(line, x, ctx.yPos);
-      ctx.yPos += lineHeight;
-    });
-    
-    ctx.doc.setTextColor(originalColor.r, originalColor.g, originalColor.b); // Reset to original color
-    ctx.yPos += fontSize * 0.25; // Small gap after text block
-  };
-
-  const addPdfHeader = (ctx: PdfContext, title: string, subTitle?: string) => {
-    addLogoToPdfPage(ctx); // Add logo to the first page (will adjust yPos if it's at MARGIN)
-    
-    addTextToPdf(ctx, title, PDF_SETTINGS.MARGIN, { fontSize: 14, fontStyle: 'bold' });
-    if (subTitle) {
-      addTextToPdf(ctx, subTitle, PDF_SETTINGS.MARGIN, { fontSize: 12, fontStyle: 'italic' });
-    }
-    // Check for page break before drawing line, if header itself is very long
-    if (ctx.yPos + 15 > ctx.footerStartY) {
-        ctx.doc.addPage();
-        ctx.yPos = PDF_SETTINGS.MARGIN;
-        addLogoToPdfPage(ctx);
-    }
-    ctx.doc.setLineWidth(0.5);
-    ctx.doc.line(PDF_SETTINGS.MARGIN, ctx.yPos, ctx.pageWidth - PDF_SETTINGS.MARGIN, ctx.yPos);
-    ctx.yPos += 15;
-  };
-
-  const addPdfFooter = (ctx: PdfContext) => {
-    // Target Y for the start of the footer content, ensuring it's not off the page
-    let targetFooterY = ctx.pageHeight - PDF_SETTINGS.MARGIN - PDF_SETTINGS.FOOTER_RESERVED_HEIGHT;
-    
-    // If current yPos is already below where the footer should start, or if we're on a new page
-    // we need to ensure yPos is at the targetFooterY or add a new page.
-    if (ctx.yPos > targetFooterY || (ctx.doc.getNumberOfPages() > 1 && ctx.yPos < targetFooterY / 2) ) {
-      // This condition implies content has already pushed past where the footer should be,
-      // or we are on a new page and haven't written much.
-      // If current yPos implies we already need a new page for the footer itself
-      if (ctx.yPos > targetFooterY) {
-          ctx.doc.addPage();
-          ctx.yPos = PDF_SETTINGS.MARGIN;
-          addLogoToPdfPage(ctx);
-      }
-      // Set yPos to where the footer should begin, ensuring it's not above current content
-      // if current content is sparse on the page.
-      ctx.yPos = Math.max(ctx.yPos, targetFooterY);
-    } else {
-        // Content has not yet reached the footer area, so move yPos down to it.
-        ctx.yPos = targetFooterY;
-    }
-     // Ensure we don't draw the footer line off the page after setting yPos
-    if (ctx.yPos + 15 > ctx.pageHeight - PDF_SETTINGS.MARGIN) {
-        ctx.doc.addPage();
-        ctx.yPos = PDF_SETTINGS.MARGIN;
-        addLogoToPdfPage(ctx);
-        ctx.yPos = Math.max(ctx.yPos, targetFooterY); // Re-adjust if needed on new page
-    }
-
-
-    ctx.doc.setLineWidth(0.2);
-    ctx.doc.line(PDF_SETTINGS.MARGIN, ctx.yPos, ctx.pageWidth - PDF_SETTINGS.MARGIN, ctx.yPos);
-    ctx.yPos += 15; // Space after line, before text
-
-    if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) {
-      const pageRangeText = `Source Pages (Printed): ${startPage} - ${endPage}`;
-      // Use addTextToPdf for footer text to handle rare case of it needing to wrap/break page
-      addTextToPdf(ctx, pageRangeText, PDF_SETTINGS.MARGIN, { fontSize: 8, fontStyle: 'italic' });
-    }
-    const telegramText = "Join Telegram: https://t.me/grade9to12ethiopia";
-    addTextToPdf(ctx, telegramText, PDF_SETTINGS.MARGIN, { fontSize: 8, fontStyle: 'italic', color: [60, 60, 60] });
-  };
-  
-  const generatePdfFilename = (baseName: string, typeSuffix: string): string => {
-    const pageRangeString = (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0)
-      ? `_p${startPage}-${endPage}`
-      : '';
-    const cleanSubject = subject.replace(/ /g, '_') || baseName;
-    const cleanGrade = grade || 'N_A';
-    return `${cleanSubject}_Grade${cleanGrade}${pageRangeString}_${typeSuffix}.pdf`;
-  };
-
-  // --- PDF Download Handlers ---
   const handleDownloadNotesPdf = async () => {
     if (!generatedNotes.trim()) {
-      toast({ title: "Cannot Download", description: "No notes have been generated.", variant: "destructive" });
+      toast({ title: "Cannot Download", description: "No notes generated.", variant: "destructive" });
       return;
     }
+
     try {
-      const ctx = await initializePdf();
-      addPdfHeader(ctx, `Study Notes: ${subject || 'Unknown'} - Grade ${grade || 'N/A'}`);
+      let logoDataUrl: string | null = null;
+      try {
+        logoDataUrl = await loadImageData('/logo.png');
+      } catch (imgError: any) {
+        console.warn("Could not load logo for PDF:", imgError.message);
+      }
+
+      const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+      const pageHeight = doc.internal.pageSize.height;
+      const pageWidth = doc.internal.pageSize.width;
+      const margin = 40;
+      const maxLineWidth = pageWidth - margin * 2;
+      let yPos = margin;
+      const footerStartY = pageHeight - margin - 50; 
+
+      let logoWidth = 30, logoHeight = 30;
+
+      const addLogoIfNeeded = () => {
+        if (logoDataUrl) {
+          const logoX = pageWidth - margin - logoWidth;
+          const logoY = margin - 10; 
+          doc.addImage(logoDataUrl!, 'PNG', logoX, logoY, logoWidth, logoHeight);
+           if (yPos === margin) { 
+             yPos = Math.max(yPos, logoY + logoHeight + 10); 
+           }
+        }
+      };
+
+      addLogoIfNeeded(); 
+
+      const addStyledText = (text: string, x: number, currentY: number, options?: any): number => {
+        const fontSize = options?.fontSize || 10;
+        const fontStyle = options?.fontStyle || 'normal';
+        const lineHeight = fontSize * (options?.lineHeightFactor || 1.2); 
+        const currentMaxWidth = options?.maxWidth || maxLineWidth;
+
+        doc.setFontSize(fontSize);
+        doc.setFont('helvetica', fontStyle);
+        if(options?.color) doc.setTextColor(options.color[0], options.color[1], options.color[2]);
+        else doc.setTextColor(0,0,0);
+
+
+        const splitText = doc.splitTextToSize(text, currentMaxWidth);
+        let newY = currentY;
+
+        splitText.forEach((line: string) => {
+          if (newY + lineHeight > footerStartY) {
+            doc.addPage();
+            newY = margin; 
+            addLogoIfNeeded(); 
+            doc.setFontSize(fontSize);
+            doc.setFont('helvetica', fontStyle);
+            if(options?.color) doc.setTextColor(options.color[0], options.color[1], options.color[2]);
+            else doc.setTextColor(0,0,0);
+          }
+          doc.text(line, x, newY); 
+          newY += lineHeight;
+        });
+        doc.setTextColor(0,0,0); 
+        return newY + (fontSize * 0.25); 
+      };
+
+      yPos = addStyledText(`Study Notes: ${subject || 'Unknown'} - Grade ${grade || 'N/A'}`, margin, yPos, { fontSize: 14, fontStyle: 'bold' });
+      if (yPos + 15 > footerStartY) { doc.addPage(); yPos = margin; addLogoIfNeeded(); } 
+      doc.setLineWidth(0.5);
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 15;
 
       const lines = generatedNotes.split('\n');
-      const listIndent = PDF_SETTINGS.MARGIN + 15;
+      const listIndent = margin + 15;
 
       lines.forEach(line => {
         const trimmedLine = line.trim();
-        let textStyle: any = { fontSize: 10, fontStyle: 'normal' };
-        let xPos = PDF_SETTINGS.MARGIN;
+        let textStyle: any = { fontSize: 10, fontStyle: 'normal' }; 
+        let xPos = margin;
+        let textToPrint = "";
 
-        if (trimmedLine.startsWith('# ')) { textStyle = { fontSize: 16, fontStyle: 'bold' }; addTextToPdf(ctx, trimmedLine.substring(2), xPos, {...textStyle, lineHeightFactor: 1.4 }); }
-        else if (trimmedLine.startsWith('## ')) { textStyle = { fontSize: 14, fontStyle: 'bold' }; addTextToPdf(ctx, trimmedLine.substring(3), xPos, {...textStyle, lineHeightFactor: 1.3 }); }
-        else if (trimmedLine.startsWith('### ')) { textStyle = { fontSize: 12, fontStyle: 'bold' }; addTextToPdf(ctx, trimmedLine.substring(4), xPos, textStyle); }
+        if (trimmedLine.startsWith('# ')) { textToPrint = trimmedLine.substring(2); textStyle = { fontSize: 16, fontStyle: 'bold', lineHeightFactor: 1.4 }; }
+        else if (trimmedLine.startsWith('## ')) { textToPrint = trimmedLine.substring(3); textStyle = { fontSize: 14, fontStyle: 'bold', lineHeightFactor: 1.3 }; }
+        else if (trimmedLine.startsWith('### ')) { textToPrint = trimmedLine.substring(4); textStyle = { fontSize: 12, fontStyle: 'bold' }; }
         else if (trimmedLine.startsWith('* ') || trimmedLine.startsWith('- ') || trimmedLine.startsWith('+ ')) {
-          const itemText = trimmedLine.substring(2).replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1'); // Basic bold/italic removal for list item text for simplicity
-          addTextToPdf(ctx, `• ${itemText}`, listIndent, textStyle);
+          textToPrint = `• ${trimmedLine.substring(2).replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1')}`;
+          xPos = listIndent;
         } else if (/^\d+\.\s/.test(trimmedLine)) {
           const numPrefix = trimmedLine.substring(0, trimmedLine.indexOf('.') + 1);
-          const itemText = trimmedLine.substring(trimmedLine.indexOf('.') + 1).trim().replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
-          addTextToPdf(ctx, `${numPrefix} ${itemText}`, listIndent, textStyle);
+          textToPrint = `${numPrefix} ${trimmedLine.substring(trimmedLine.indexOf('.') + 1).trim().replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1')}`;
+          xPos = listIndent;
         } else if (trimmedLine === '---' || trimmedLine === '***' || trimmedLine === '___') {
-          if (ctx.yPos + 15 > ctx.footerStartY) { ctx.doc.addPage(); ctx.yPos = PDF_SETTINGS.MARGIN; addLogoToPdfPage(ctx); }
-          ctx.doc.setLineWidth(0.5);
-          ctx.doc.line(PDF_SETTINGS.MARGIN, ctx.yPos + 5, ctx.pageWidth - PDF_SETTINGS.MARGIN, ctx.yPos + 5);
-          ctx.yPos += 15;
+          if (yPos + 15 > footerStartY) { doc.addPage(); yPos = margin; addLogoIfNeeded(); }
+          doc.setLineWidth(0.5);
+          doc.line(margin, yPos + 5, pageWidth - margin, yPos + 5);
+          yPos += 15;
+          return; 
         } else if (trimmedLine.startsWith('> ')) {
-          addTextToPdf(ctx, trimmedLine.substring(2), PDF_SETTINGS.MARGIN + 10, { ...textStyle, fontStyle: 'italic' });
+          textToPrint = trimmedLine.substring(2);
+          xPos = margin + 10;
+          textStyle = { ...textStyle, fontStyle: 'italic' };
         } else if (trimmedLine) {
-          // Basic styling removal for plain text. More robust Markdown parsing is complex for jsPDF.
-          const cleanedLine = trimmedLine.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').replace(/`(.*?)`/g, '"$1"');
-          addTextToPdf(ctx, cleanedLine, xPos, textStyle);
+          textToPrint = trimmedLine.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').replace(/`(.*?)`/g, '"$1"');
         }
-        // else: empty line, addTextToPdf will skip it. Implicitly adds some vertical space.
+
+        if (textToPrint) {
+          yPos = addStyledText(textToPrint, xPos, yPos, textStyle);
+        } else if (!trimmedLine && lines.indexOf(line) < lines.length -1 ) { 
+            yPos += (textStyle.fontSize || 10) * 0.5; 
+            if (yPos > footerStartY) { 
+                doc.addPage(); yPos = margin; addLogoIfNeeded();
+            }
+        }
       });
 
-      addPdfFooter(ctx);
-      const filename = generatePdfFilename('Notes', 'Notes');
-      ctx.doc.save(filename);
+      if (yPos < footerStartY) {
+          yPos = footerStartY;
+      }
+      if (yPos + 40 > pageHeight - margin) { 
+          doc.addPage(); yPos = margin; addLogoIfNeeded();
+          yPos = footerStartY;
+      }
+
+      doc.setLineWidth(0.2);
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 15;
+
+      if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) {
+        const pageRangeText = `Source Pages (Printed): ${startPage} - ${endPage}`;
+        yPos = addStyledText(pageRangeText, margin, yPos, { fontSize: 8, fontStyle: 'italic' });
+      }
+      const telegramText = "Join Telegram: https://t.me/grade9to12ethiopia";
+      yPos = addStyledText(telegramText, margin, yPos, { fontSize: 8, fontStyle: 'italic', color: [60, 60, 60] });
+
+      const pageRangeString = (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) ? `_p${startPage}-${endPage}` : '';
+      const filename = `${subject.replace(/ /g, '_') || 'Notes'}_Grade${grade || 'N_A'}${pageRangeString}_Notes.pdf`;
+      doc.save(filename);
       toast({ title: "Download Started", description: `Downloading ${filename}` });
+
     } catch (error) {
       console.error("Error generating Notes PDF:", error);
-      toast({ title: "PDF Generation Error", description: "Could not generate PDF for notes.", variant: "destructive" });
+      toast({ title: "PDF Error", description: "Could not generate PDF for notes.", variant: "destructive" });
     }
   };
 
   const handleDownloadQuestionsPdf = async () => {
     const questionsToDownload = generatedQuestions[activeQuestionTab];
     const currentQuestionTypeTitle = QUESTION_TYPE_TITLES[activeQuestionTab];
-
     if (!questionsToDownload || questionsToDownload.length === 0) {
       toast({ title: "Cannot Download", description: `No ${currentQuestionTypeTitle} questions generated.`, variant: "destructive" });
       return;
     }
-
     try {
-      const ctx = await initializePdf();
-      addPdfHeader(
-        ctx,
-        `Practice Questions: ${subject || 'Unknown'} - Grade ${grade || 'N/A'}`,
-        `Type: ${currentQuestionTypeTitle}`
-      );
+      let logoDataUrl: string | null = null;
+      try {
+        logoDataUrl = await loadImageData('/logo.png');
+      } catch (imgError: any) {
+        console.warn("Could not load logo for PDF:", imgError.message);
+      }
+
+      const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+      const pageHeight = doc.internal.pageSize.height;
+      const pageWidth = doc.internal.pageSize.width;
+      const margin = 40;
+      const maxLineWidth = pageWidth - margin * 2;
+      let yPos = margin;
+      const footerStartY = pageHeight - margin - 60; 
+
+      let logoWidth = 30, logoHeight = 30;
+
+      const addLogoIfNeeded = () => {
+        if (logoDataUrl) {
+          const logoX = pageWidth - margin - logoWidth;
+          const logoY = margin - 10;
+          doc.addImage(logoDataUrl!, 'PNG', logoX, logoY, logoWidth, logoHeight);
+           if (yPos === margin) {
+             yPos = Math.max(yPos, logoY + logoHeight + 10);
+           }
+        }
+      };
       
+      addLogoIfNeeded();
+
+      const addText = (text: string | undefined | null, x: number, currentY: number, options?: any): number => {
+        if (!text || !text.trim()) return currentY;
+        const fontSize = options?.fontSize || 10;
+        const fontStyle = options?.fontStyle || 'normal';
+        const lineHeight = fontSize * (options?.lineHeightFactor || 1.2);
+        const currentMaxWidth = options?.maxWidth || maxLineWidth;
+        
+        doc.setFontSize(fontSize);
+        doc.setFont('helvetica', fontStyle);
+        if(options?.color) doc.setTextColor(options.color[0], options.color[1], options.color[2]);
+        else doc.setTextColor(0,0,0);
+
+        const split = doc.splitTextToSize(text, currentMaxWidth);
+        let newY = currentY;
+        split.forEach((line: string) => {
+          if (newY + lineHeight > footerStartY) { 
+            doc.addPage();
+            newY = margin;
+            addLogoIfNeeded();
+            doc.setFontSize(fontSize);
+            doc.setFont('helvetica', fontStyle);
+            if(options?.color) doc.setTextColor(options.color[0], options.color[1], options.color[2]);
+            else doc.setTextColor(0,0,0);
+          }
+          doc.text(line, x, newY);
+          newY += lineHeight;
+        });
+        doc.setTextColor(0,0,0); 
+        return newY + (fontSize * 0.25); 
+      };
+
+      yPos = addText(`Practice Questions: ${subject || 'Unknown'} - Grade ${grade || 'N/A'}`, margin, yPos, { fontSize: 14, fontStyle: 'bold' });
+      yPos = addText(`Type: ${currentQuestionTypeTitle}`, margin, yPos, { fontSize: 12, fontStyle: 'italic' });
+      if (yPos + 15 > footerStartY) { doc.addPage(); yPos = margin; addLogoIfNeeded(); }
+      doc.setLineWidth(0.5);
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 15;
+
       questionsToDownload.forEach((q, index) => {
-        // Ensure space for question number, question, options (if any), answer, explanation
-        // This is a rough estimate; addTextToPdf will handle actual page breaks.
-        if (ctx.yPos + 60 > ctx.footerStartY && index > 0) { // 60 is a guess for a question block
-            ctx.doc.addPage();
-            ctx.yPos = PDF_SETTINGS.MARGIN;
-            addLogoToPdfPage(ctx);
+        if (yPos + 80 > footerStartY && index > 0) { 
+             doc.addPage(); yPos = margin; addLogoIfNeeded();
         }
 
-        addTextToPdf(ctx, `${index + 1}. ${q.question || 'Missing Question Text'}`, PDF_SETTINGS.MARGIN, { fontStyle: 'bold' });
-        ctx.yPos += 5;
+        yPos = addText(`${index + 1}. ${q.question || 'Missing Question Text'}`, margin, yPos, { fontStyle: 'bold', maxWidth: maxLineWidth });
+        yPos += 5; 
 
         if (activeQuestionTab === 'multiple-choice' && q.options) {
-          const { cleanedOptions } = processMcqDetails(q); // Use processed details
-          cleanedOptions.forEach((opt, optIndex) => {
+            const { cleanedOptions } = processMcqDetails(q); 
+            cleanedOptions.forEach((opt, optIndex) => {
             const letter = getCorrectAnswerLetter(optIndex);
-            addTextToPdf(ctx, `${letter}) ${opt || 'Missing Option'}`, PDF_SETTINGS.MARGIN + 15, { maxWidth: ctx.maxLineWidth - 15 });
+            yPos = addText(`${letter}) ${opt || 'Missing Option'}`, margin + 15, yPos, { maxWidth: maxLineWidth - 15 });
           });
-          ctx.yPos += 5;
+          yPos += 5; 
         }
         
-        // Answer and Explanation
-        ctx.doc.setFont('helvetica', 'italic'); // Italic for "Answer:" and "Explanation:" prefixes
-        ctx.yPos += 2;
         let answerText = 'Answer: Not provided';
         if (activeQuestionTab !== 'multiple-choice' && q.answer) {
           answerText = `Answer: ${q.answer}`;
         } else if (activeQuestionTab === 'multiple-choice') {
-          const { displayCorrectLetter } = processMcqDetails(q);
+          const { displayCorrectLetter } = processMcqDetails(q); 
           answerText = displayCorrectLetter ? `Correct Answer: ${displayCorrectLetter}` : 'Correct Answer: Could not determine';
         }
-        addTextToPdf(ctx, answerText, PDF_SETTINGS.MARGIN + 15, { fontStyle: 'italic', maxWidth: ctx.maxLineWidth - 15});
+        yPos = addText(answerText, margin + 15, yPos, { fontStyle: 'italic', maxWidth: maxLineWidth - 15 });
         
         if (q.explanation) {
-          addTextToPdf(ctx, `Explanation: ${q.explanation}`, PDF_SETTINGS.MARGIN + 15, { fontStyle: 'italic', maxWidth: ctx.maxLineWidth - 15});
+          yPos = addText(`Explanation: ${q.explanation}`, margin + 15, yPos, { fontStyle: 'italic', maxWidth: maxLineWidth - 15 });
         }
-        ctx.doc.setFont('helvetica', 'normal'); // Reset font style
-        ctx.yPos += 8;
+        yPos += 8; 
 
         if (index < questionsToDownload.length - 1) {
-          // Add a separator line between questions, ensure it doesn't cross into footer
-          if (ctx.yPos + 10 > ctx.footerStartY) { // 10 for line + padding
-            ctx.doc.addPage();
-            ctx.yPos = PDF_SETTINGS.MARGIN;
-            addLogoToPdfPage(ctx);
+          if (yPos + 10 > footerStartY) { 
+             doc.addPage(); yPos = margin; addLogoIfNeeded();
           } else {
-            ctx.doc.setLineWidth(0.2);
-            ctx.doc.line(PDF_SETTINGS.MARGIN, ctx.yPos, ctx.pageWidth - PDF_SETTINGS.MARGIN, ctx.yPos);
-            ctx.yPos += 10;
+            doc.setLineWidth(0.2);
+            doc.line(margin, yPos, pageWidth - margin, yPos);
+            yPos += 10; 
           }
         }
       });
 
-      addPdfFooter(ctx);
-      const filename = generatePdfFilename('Questions', `${activeQuestionTab}_Questions`);
-      ctx.doc.save(filename);
-      toast({ title: "Download Started", description: `Downloading ${filename}` });
+      if (yPos < footerStartY) { 
+          yPos = footerStartY;
+      }
+       if (yPos + 40 > pageHeight - margin) { 
+          doc.addPage(); yPos = margin; addLogoIfNeeded();
+          yPos = footerStartY; 
+      }
 
+      doc.setLineWidth(0.2);
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 15;
+
+      if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) {
+        const pageRangeText = `Source Pages (Printed): ${startPage} - ${endPage}`;
+        yPos = addText(pageRangeText, margin, yPos, { fontSize: 8, fontStyle: 'italic' });
+      }
+      const telegramText = "Join Telegram: https://t.me/grade9to12ethiopia";
+      yPos = addText(telegramText, margin, yPos, { fontSize: 8, fontStyle: 'italic', color: [60, 60, 60] });
+
+      const pageRangeString = (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) ? `_p${startPage}-${endPage}` : '';
+      const filename = `${subject.replace(/ /g, '_') || 'Questions'}_Grade${grade || 'N_A'}${pageRangeString}_${activeQuestionTab}_Questions.pdf`;
+      doc.save(filename);
+      toast({ title: "Download Started", description: `Downloading ${filename}` });
     } catch (error) {
       console.error("Error generating Questions PDF:", error);
-      toast({ title: "PDF Generation Error", description: "Could not generate PDF for questions.", variant: "destructive" });
+      toast({ title: "PDF Error", description: "Could not generate PDF for questions.", variant: "destructive" });
     }
   };
-
 
   // === Main Component Render ===
   return (
@@ -956,7 +929,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       key={type}
                       value={type}
                       className="absolute inset-0 focus-visible:ring-0 focus-visible:ring-offset-0 m-0"
-                      tabIndex={-1} // Ensure content is not focusable when hidden
+                      tabIndex={-1} 
                     >
                       {isLoading && questions.length === 0 ? (
                         <div className="flex h-full flex-col items-center justify-center text-muted-foreground p-6 text-center">

@@ -1,110 +1,71 @@
 // src/app/api/register/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
-// !! IMPORTANT: In a real app, uncomment and use bcrypt !!
-// import bcrypt from 'bcrypt';
-
-const usersFilePath = path.join(process.cwd(), 'users.json');
-
-// Helper function to ensure the users file exists and has the correct structure
-// ** Correction: No argument needed here, it uses the global usersFilePath **
-async function ensureUsersFile(): Promise<{ users: any[] }> {
-    try {
-        const fileContent = await fs.readFile(usersFilePath, 'utf-8');
-        const usersData = JSON.parse(fileContent);
-        // Validate the basic structure
-        if (usersData && Array.isArray(usersData.users)) {
-            return usersData;
-        } else {
-            console.warn("users.json has invalid structure. Re-initializing.");
-            // If structure is invalid, overwrite with the correct empty structure
-            const initialData = { users: [] };
-            await fs.writeFile(usersFilePath, JSON.stringify(initialData, null, 2));
-            return initialData;
-        }
-    } catch (error: any) {
-        if (error.code === 'ENOENT') {
-            // File doesn't exist, create it with the initial structure
-            console.log("users.json not found. Creating a new one.");
-            const initialData = { users: [] };
-            await fs.writeFile(usersFilePath, JSON.stringify(initialData, null, 2));
-            return initialData;
-        } else if (error instanceof SyntaxError) {
-             console.error("Error parsing users.json. Re-initializing.", error);
-             // File exists but is not valid JSON, overwrite
-             const initialData = { users: [] };
-             await fs.writeFile(usersFilePath, JSON.stringify(initialData, null, 2));
-             return initialData;
-        }
-         else {
-            // Other read errors (permissions, etc.)
-            console.error("Failed to read or initialize users.json:", error);
-            throw new Error("Could not load or initialize user data file."); // Re-throw critical errors
-        }
-    }
-}
-
+import { sql } from '@vercel/postgres'; // Import the sql tag
+import bcrypt from 'bcryptjs'; // Use bcryptjs
 
 export async function POST(req: NextRequest) {
   try {
     const { phoneNumber, password, fullName, gradeLevel } = await req.json();
 
     // --- Input Validation ---
-    if (!phoneNumber || !password || !fullName || !gradeLevel) {
-      return NextResponse.json({ message: 'Phone number, password, full name, and grade level are required.' }, { status: 400 });
-    }
+    if (!phoneNumber || !password || !fullName || !gradeLevel) { return NextResponse.json({ success: false, message: 'All fields are required.' }, { status: 400 }); }
     const trimmedPhoneNumber = String(phoneNumber).trim();
     const trimmedFullName = String(fullName).trim();
-
-    if (!/^(09|07)\d{8}$/.test(trimmedPhoneNumber)) {
-        return NextResponse.json({ message: 'Invalid phone number format (must be 10 digits starting with 09 or 07).' }, { status: 400 });
-    }
-    if (password.length < 6) {
-        return NextResponse.json({ message: 'Password must be at least 6 characters long.' }, { status: 400 });
-    }
-    if (trimmedFullName.length < 3) {
-        return NextResponse.json({ message: 'Full name must be at least 3 characters long.' }, { status: 400 });
-    }
+    if (!/^(09|07)\d{8}$/.test(trimmedPhoneNumber)) { return NextResponse.json({ success: false, message: 'Invalid phone format (10 digits starting 09 or 07).' }, { status: 400 }); }
+    if (password.length < 6) { return NextResponse.json({ success: false, message: 'Password min 6 characters.' }, { status: 400 }); }
+    if (trimmedFullName.length < 3) { return NextResponse.json({ success: false, message: 'Full name min 3 characters.' }, { status: 400 }); }
     const allowedGrades = ["9", "10", "11", "12"];
-    if (!allowedGrades.includes(String(gradeLevel))) {
-         return NextResponse.json({ message: `Invalid grade level. Please select one of: ${allowedGrades.join(', ')}.` }, { status: 400 });
+    if (!allowedGrades.includes(String(gradeLevel))) { return NextResponse.json({ success: false, message: 'Invalid grade level.' }, { status: 400 }); }
+
+    // --- Check for Existing User in DB ---
+    // Use parameterized query to prevent SQL injection
+    const { rows: existingUsers } = await sql`
+      SELECT id FROM users WHERE phone_number = ${trimmedPhoneNumber} LIMIT 1;
+    `;
+
+    if (existingUsers.length > 0) {
+      console.log(`Registration attempt failed: Phone ${trimmedPhoneNumber} already exists.`);
+      return NextResponse.json({ success: false, message: 'Phone number already registered.' }, { status: 409 }); // Conflict
     }
 
-    // --- Load or Initialize User Data ---
-    // ** Correction: Call helper without arguments **
-    const usersData = await ensureUsersFile();
+    // --- Hash Password ---
+    const saltRounds = 10; // Cost factor for hashing
+    const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // --- Check for Existing User ---
-    const existingUser = usersData.users.find((u: { phoneNumber: string }) => u.phoneNumber === trimmedPhoneNumber);
-    if (existingUser) {
-      return NextResponse.json({ message: 'Phone number already registered.' }, { status: 409 });
+    // --- Insert New User into DB ---
+    // Use parameters for all values going into the query
+    const { rows: insertedUsers } = await sql`
+      INSERT INTO users (phone_number, password_hash, full_name, grade_level, is_confirmed)
+      VALUES (${trimmedPhoneNumber}, ${passwordHash}, ${trimmedFullName}, ${String(gradeLevel)}, true) -- Auto-confirm true
+      RETURNING id, phone_number, full_name, grade_level, registered_at; -- Return created user data (excluding hash)
+    `;
+
+    // Ensure insertion worked and data was returned
+    if (!insertedUsers || insertedUsers.length === 0) {
+        throw new Error("User registration failed after insertion attempt.");
     }
+    const newUser = insertedUsers[0];
 
-    // --- Hash Password (!! INSECURE PLACEHOLDER !!) ---
-    const hashedPassword = password; // Replace with bcrypt!
+    console.log(`User registered: ${newUser.phone_number}, Name: ${newUser.full_name}, Grade: ${newUser.grade_level}`);
 
-    // --- Create New User Object ---
-    const newUser = {
-      phoneNumber: trimmedPhoneNumber,
-      password: hashedPassword,
-      fullName: trimmedFullName,
-      gradeLevel: String(gradeLevel),
-      isConfirmed: true, // Auto-confirm for now
-      registeredAt: new Date().toISOString(),
-    };
-
-    // --- Add User and Save ---
-    usersData.users.push(newUser);
-    await fs.writeFile(usersFilePath, JSON.stringify(usersData, null, 2));
-
-    console.log(`User registered: ${trimmedPhoneNumber}, Name: ${trimmedFullName}, Grade: ${gradeLevel}`);
-
-    return NextResponse.json({ success: true, message: 'Registration successful! You are now logged in.' }, { status: 201 });
+    return NextResponse.json({
+        success: true,
+        message: 'Registration successful! You are now logged in.',
+        user: newUser // Send back the created user data
+    }, { status: 201 });
 
   } catch (error: any) {
     console.error('Error during user registration:', error);
+    // Check for specific database errors (like unique constraint)
+    if (error.message?.includes('duplicate key value violates unique constraint')) {
+         return NextResponse.json({ success: false, message: 'Phone number already registered.' }, { status: 409 });
+    }
+    // Check if the error is from Vercel Postgres connection
+    if (error.message?.includes('missing environment variable')) {
+         console.error("Database connection error: Missing environment variables. Ensure Vercel project is linked and env vars are pulled.");
+         return NextResponse.json({ success: false, message: 'Database configuration error.' }, { status: 500 });
+    }
     return NextResponse.json({ success: false, message: error.message || 'Internal server error during registration.' }, { status: 500 });
   }
 }

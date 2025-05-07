@@ -300,26 +300,59 @@ const Dashboard: React.FC<DashboardProps> = ({
 
          {/* Content Area Grid */}
          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-             {/* Notes Card */}
-             <Card className="shadow-md dark:shadow-slate-800/50 border border-border/50 flex flex-col min-h-[500px] md:min-h-[600px] lg:min-h-[700px]">
-                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 md:p-6">
-                     <CardTitle className="text-base md:text-lg flex items-center gap-2"> <FileText className="h-4 w-4 md:h-5 md:w-5 text-primary/80"/> Generated Notes </CardTitle>
-                     <Button variant="outline" size="sm" onClick={handleDownloadNotesPdf} disabled={!generatedNotes.trim() || isGeneratingNotes} title="Download Notes as PDF" > <Download className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-1.5" /> <span className="hidden sm:inline">Download </span>PDF </Button>
-                 </CardHeader>
-                 <CardContent className="flex-grow flex flex-col p-0">
-                    {isGeneratingNotes && !generatedNotes ? ( <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground p-6 text-center"> <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin mb-4 text-primary" /> <p className="text-xs md:text-sm font-medium">{noteGenerationMessage || "Generating notes..."}</p> </div> )
-                     : !generatedNotes.trim() ? ( <div className="flex flex-col items-center justify-center flex-grow text-muted-foreground p-6 text-center"> <FileText size={48} className="mb-4 opacity-50" /> <p className="text-sm font-medium">No Notes Generated</p> <p className="text-xs mt-1">Click "Generate Notes" above or check input.</p> </div> )
-                     : (
-                         <ScrollArea className="flex-grow w-full rounded-b-lg border-t dark:border-slate-700">
-                             <div className="p-5 md:p-8 prose prose-sm sm:prose-base dark:prose-invert max-w-none">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]} >
-                                    {generatedNotes}
-                                </ReactMarkdown>
-                             </div>
-                         </ScrollArea>
-                     )}
-                 </CardContent>
-             </Card>
+{/* Notes Card */}
+<Card className="shadow-md dark:shadow-slate-800/50 border border-border/50 flex flex-col min-h-[500px] md:min-h-[600px] lg:min-h-[700px]">
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 md:p-6">
+    <CardTitle className="text-base md:text-lg flex items-center gap-2">
+      <FileText className="h-4 w-4 md:h-5 md:w-5 text-primary/80" /> Generated Notes
+    </CardTitle>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleDownloadNotesPdf}
+      disabled={!generatedNotes.trim() || isGeneratingNotes}
+      title="Download Notes as PDF"
+    >
+      <Download className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-1.5" />
+      <span className="hidden sm:inline">Download </span>PDF
+    </Button>
+  </CardHeader>
+
+  <CardContent className="flex-grow flex flex-col p-0">
+    {isGeneratingNotes && !generatedNotes ? (
+      <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
+        <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin mb-4 text-primary" />
+        <p className="text-xs md:text-sm font-medium">{noteGenerationMessage || "Generating notes..."}</p>
+      </div>
+    ) : !generatedNotes.trim() ? (
+      <div className="flex flex-col items-center justify-center flex-grow text-muted-foreground p-6 text-center">
+        <FileText size={48} className="mb-4 opacity-50" />
+        <p className="text-sm font-medium">No Notes Generated</p>
+        <p className="text-xs mt-1">Click "Generate Notes" above or check input.</p>
+      </div>
+    ) : (
+      <ScrollArea className="flex-grow w-full rounded-b-lg border-t dark:border-slate-700">
+        <div className="p-5 md:p-8 overflow-auto">
+          <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                table: ({ node, ...props }) => (
+                  <div className="overflow-x-auto">
+                    <table {...props} />
+                  </div>
+                ),
+              }}
+            >
+              {generatedNotes}
+            </ReactMarkdown>
+          </div>
+        </div>
+      </ScrollArea>
+    )}
+  </CardContent>
+</Card>
+
 
              {/* Questions Card */}
              <Card className="shadow-md dark:shadow-slate-800/50 border border-border/50 flex flex-col min-h-[500px] md:min-h-[600px] lg:min-h-[700px]">
@@ -347,4 +380,3 @@ const Dashboard: React.FC<DashboardProps> = ({
 };
 
 export default Dashboard;
-

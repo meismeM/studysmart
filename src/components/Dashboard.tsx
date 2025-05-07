@@ -455,7 +455,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     MARGIN: 40,
     LOGO_WIDTH: 30,
     LOGO_HEIGHT: 30,
-    FOOTER_RESERVED_HEIGHT: 40, // Approximate height for footer content
+    FOOTER_RESERVED_HEIGHT: 50, // Increased slightly for more buffer
   };
 
   type PdfContext = {
@@ -464,7 +464,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     pageWidth: number;
     pageHeight: number;
     maxLineWidth: number;
-    footerStartY: number;
+    footerStartY: number; // The Y coordinate where main content should stop to leave space for footer
     logoDataUrl: string | null;
   };
 
@@ -484,6 +484,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       pageWidth,
       pageHeight,
       maxLineWidth: pageWidth - PDF_SETTINGS.MARGIN * 2,
+      // footerStartY is where content drawing should ideally stop to make room for the footer.
       footerStartY: pageHeight - PDF_SETTINGS.MARGIN - PDF_SETTINGS.FOOTER_RESERVED_HEIGHT,
       logoDataUrl,
     };
@@ -494,9 +495,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       const logoX = ctx.pageWidth - PDF_SETTINGS.MARGIN - PDF_SETTINGS.LOGO_WIDTH;
       const logoY = PDF_SETTINGS.MARGIN - 10; // Slightly above top margin
       ctx.doc.addImage(ctx.logoDataUrl, 'PNG', logoX, logoY, PDF_SETTINGS.LOGO_WIDTH, PDF_SETTINGS.LOGO_HEIGHT);
-      // Adjust yPos if it's the first content after logo on a fresh page
+      
+      // If yPos is at the top margin (e.g., new page), ensure it's pushed below the logo.
       if (ctx.yPos === PDF_SETTINGS.MARGIN) {
-         ctx.yPos = Math.max(ctx.yPos, logoY + PDF_SETTINGS.LOGO_HEIGHT + 5);
+         ctx.yPos = Math.max(ctx.yPos, logoY + PDF_SETTINGS.LOGO_HEIGHT + 10); // +10 for padding below logo
       }
     }
   };
@@ -509,19 +511,21 @@ const Dashboard: React.FC<DashboardProps> = ({
       fontSize?: number;
       fontStyle?: 'normal' | 'bold' | 'italic' | 'bolditalic';
       maxWidth?: number;
-      color?: [number, number, number] | string; // RGB array or hex/named string
+      color?: [number, number, number] | string;
       lineHeightFactor?: number;
     } = {}
   ): void => {
-    if (!text.trim()) return;
+    if (!text || !text.trim()) return;
   
     const fontSize = options.fontSize || 10;
     const fontStyle = options.fontStyle || 'normal';
-    constmaxWidth = options.maxWidth || ctx.maxLineWidth;
+    const currentMaxWidth = options.maxWidth || ctx.maxLineWidth; // Use a different name or ctx directly
     const lineHeight = fontSize * (options.lineHeightFactor || 1.2);
   
     ctx.doc.setFontSize(fontSize);
     ctx.doc.setFont('helvetica', fontStyle);
+    const originalColor = ctx.doc.getTextColor(); // Store original color
+
     if (options.color) {
       if (Array.isArray(options.color)) ctx.doc.setTextColor(options.color[0], options.color[1], options.color[2]);
       else ctx.doc.setTextColor(options.color as string);
@@ -529,14 +533,15 @@ const Dashboard: React.FC<DashboardProps> = ({
       ctx.doc.setTextColor(0, 0, 0); // Default to black
     }
   
-    const splitText = ctx.doc.splitTextToSize(text, maxWidth);
+    const splitText = ctx.doc.splitTextToSize(text, currentMaxWidth);
   
     splitText.forEach((line: string) => {
-      // Check if NEXT line would go past footer start area or page bottom
+      // Check if NEXT line would go past the calculated footerStartY
       if (ctx.yPos + lineHeight > ctx.footerStartY) {
         ctx.doc.addPage();
-        ctx.yPos = PDF_SETTINGS.MARGIN;
-        addLogoToPdfPage(ctx);
+        ctx.yPos = PDF_SETTINGS.MARGIN; // Reset Y for new page
+        addLogoToPdfPage(ctx);        // Add logo, which might adjust yPos further
+        
         // Re-apply font settings on new page
         ctx.doc.setFontSize(fontSize);
         ctx.doc.setFont('helvetica', fontStyle);
@@ -550,15 +555,23 @@ const Dashboard: React.FC<DashboardProps> = ({
       ctx.doc.text(line, x, ctx.yPos);
       ctx.yPos += lineHeight;
     });
-    ctx.doc.setTextColor(0,0,0); // Reset to black
+    
+    ctx.doc.setTextColor(originalColor.r, originalColor.g, originalColor.b); // Reset to original color
     ctx.yPos += fontSize * 0.25; // Small gap after text block
   };
 
   const addPdfHeader = (ctx: PdfContext, title: string, subTitle?: string) => {
-    addLogoToPdfPage(ctx); // Add logo to the first page
+    addLogoToPdfPage(ctx); // Add logo to the first page (will adjust yPos if it's at MARGIN)
+    
     addTextToPdf(ctx, title, PDF_SETTINGS.MARGIN, { fontSize: 14, fontStyle: 'bold' });
     if (subTitle) {
       addTextToPdf(ctx, subTitle, PDF_SETTINGS.MARGIN, { fontSize: 12, fontStyle: 'italic' });
+    }
+    // Check for page break before drawing line, if header itself is very long
+    if (ctx.yPos + 15 > ctx.footerStartY) {
+        ctx.doc.addPage();
+        ctx.yPos = PDF_SETTINGS.MARGIN;
+        addLogoToPdfPage(ctx);
     }
     ctx.doc.setLineWidth(0.5);
     ctx.doc.line(PDF_SETTINGS.MARGIN, ctx.yPos, ctx.pageWidth - PDF_SETTINGS.MARGIN, ctx.yPos);
@@ -566,28 +579,43 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const addPdfFooter = (ctx: PdfContext) => {
-     // If current yPos is already too close to where footer should be, or past it, add new page.
-    if (ctx.yPos > ctx.footerStartY - PDF_SETTINGS.FOOTER_RESERVED_HEIGHT / 2) {
+    // Target Y for the start of the footer content, ensuring it's not off the page
+    let targetFooterY = ctx.pageHeight - PDF_SETTINGS.MARGIN - PDF_SETTINGS.FOOTER_RESERVED_HEIGHT;
+    
+    // If current yPos is already below where the footer should start, or if we're on a new page
+    // we need to ensure yPos is at the targetFooterY or add a new page.
+    if (ctx.yPos > targetFooterY || (ctx.doc.getNumberOfPages() > 1 && ctx.yPos < targetFooterY / 2) ) {
+      // This condition implies content has already pushed past where the footer should be,
+      // or we are on a new page and haven't written much.
+      // If current yPos implies we already need a new page for the footer itself
+      if (ctx.yPos > targetFooterY) {
+          ctx.doc.addPage();
+          ctx.yPos = PDF_SETTINGS.MARGIN;
+          addLogoToPdfPage(ctx);
+      }
+      // Set yPos to where the footer should begin, ensuring it's not above current content
+      // if current content is sparse on the page.
+      ctx.yPos = Math.max(ctx.yPos, targetFooterY);
+    } else {
+        // Content has not yet reached the footer area, so move yPos down to it.
+        ctx.yPos = targetFooterY;
+    }
+     // Ensure we don't draw the footer line off the page after setting yPos
+    if (ctx.yPos + 15 > ctx.pageHeight - PDF_SETTINGS.MARGIN) {
         ctx.doc.addPage();
         ctx.yPos = PDF_SETTINGS.MARGIN;
         addLogoToPdfPage(ctx);
+        ctx.yPos = Math.max(ctx.yPos, targetFooterY); // Re-adjust if needed on new page
     }
 
-    ctx.yPos += 10; // Space before footer line
-    // Ensure there's enough space for the footer line itself and content below it.
-    // This check might be redundant if addTextToPdf handles it well, but good for the line.
-    if (ctx.yPos + 15 > ctx.footerStartY) { // 15 for line and some text
-        ctx.doc.addPage();
-        ctx.yPos = PDF_SETTINGS.MARGIN;
-        addLogoToPdfPage(ctx);
-    }
 
     ctx.doc.setLineWidth(0.2);
     ctx.doc.line(PDF_SETTINGS.MARGIN, ctx.yPos, ctx.pageWidth - PDF_SETTINGS.MARGIN, ctx.yPos);
-    ctx.yPos += 15;
+    ctx.yPos += 15; // Space after line, before text
 
     if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) {
       const pageRangeText = `Source Pages (Printed): ${startPage} - ${endPage}`;
+      // Use addTextToPdf for footer text to handle rare case of it needing to wrap/break page
       addTextToPdf(ctx, pageRangeText, PDF_SETTINGS.MARGIN, { fontSize: 8, fontStyle: 'italic' });
     }
     const telegramText = "Join Telegram: https://t.me/grade9to12ethiopia";

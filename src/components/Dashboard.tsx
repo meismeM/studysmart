@@ -75,7 +75,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   startPage,
   endPage
 }) => {
-  
   const [chapterContent, setChapterContent] = useState(initialChapterContent);
   const [generatedNotes, setGeneratedNotes] = useState('');
   const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
@@ -88,7 +87,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [activeQuestionTab, setActiveQuestionTab] = useState<CurrentQuestionTypeValue>('multiple-choice');
   const { toast } = useToast();
 
-
   const initialQuestionState = useMemo(() => createInitialRecordState(availableQuestionTypes, []), []);
   const initialLoadingState = useMemo(() => createInitialRecordState(availableQuestionTypes, false), []);
   const initialMessageState = useMemo(() => createInitialRecordState<string | null>(availableQuestionTypes, null), []);
@@ -96,11 +94,9 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   useEffect(() => { setChapterContent(initialChapterContent); setGeneratedNotes(''); setIsGeneratingNotes(false); setNoteGenerationMessage(null); setGeneratedQuestions(initialQuestionState); setIsGeneratingQuestions(initialLoadingState); setQuestionGenerationMessage(initialMessageState); setShowAnswer(initialShowAnswerState); setComponentError(null); setActiveQuestionTab('multiple-choice'); }, [initialChapterContent, subject, grade, initialQuestionState, initialLoadingState, initialMessageState, initialShowAnswerState]);
 
-
   const getCorrectAnswerLetter = (index?: number): string | null => { if (typeof index !== 'number' || index < 0 || index > 3) return null; return String.fromCharCode(65 + index); };
   const toggleShowAnswer = ( questionType: CurrentQuestionTypeValue, index: number ) => { setShowAnswer((prev) => { const current = prev[questionType] ?? {}; return { ...prev, [questionType]: { ...current, [index]: !current[index] } }; }); };
   const validateInputs = (): boolean => { setComponentError(null); let isValid = true; let errorMsg = ''; if (!subject || !grade) { errorMsg = 'Grade & Subject required.'; isValid = false; } else if (!chapterContent || chapterContent.trim().length < 20) { errorMsg = 'Chapter content missing or too short.'; isValid = false; } if (!isValid) { toast({ title: 'Input Missing', description: errorMsg, variant: 'destructive' }); setComponentError(errorMsg); } return isValid; };
-
 
   const renderInlineFormatting = (text: string | null | undefined): string => { if (!text) return ''; let html = text; html = html.replace(/</g, '<').replace(/>/g, '>'); html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'); html = html.replace(/__(.*?)__/g, '<strong>$1</strong>'); html = html.replace(/(?<!\w)\*(?!\s)(.+?)(?<!\s)\*(?!\w)/g, '<em>$1</em>'); html = html.replace(/(?<!\w)_(?!\s)(.+?)(?<!\s)_(?!\w)/g, '<em>$1</em>'); html = html.replace(/`(.*?)`/g, '<code class="bg-muted text-muted-foreground px-1 py-0.5 rounded font-mono text-sm">$1</code>'); html = html.replace(/__+/g, '<span class="italic text-muted-foreground">[blank]</span>'); return html; };
   const renderQuestionContent = ( questionType: CurrentQuestionTypeValue, question: Question, index: number ): React.ReactNode => {
@@ -116,19 +112,16 @@ const Dashboard: React.FC<DashboardProps> = ({
   const handleGenerateQuestions = async (questionType: CurrentQuestionTypeValue) => { if (!validateInputs()) return; const typeTitle = questionTypeTitles[questionType]; setGeneratedQuestions(prev => ({ ...prev, [questionType]: [] })); setShowAnswer(prev => ({ ...prev, [questionType]: {} })); setIsGeneratingQuestions(prev => ({ ...prev, [questionType]: true })); setQuestionGenerationMessage(prev => ({ ...prev, [questionType]: `AI generating ${typeTitle}...` })); setComponentError(null); try { const numQuestionsToRequest = 10; const inputData: GenerateStudyQuestionsInput = { chapterContent: chapterContent, questionType: questionType, numberOfQuestions: numQuestionsToRequest, gradeLevel: `${grade}th Grade`, subject: subject }; const result = await generateStudyQuestions(inputData); if (result?.questions && Array.isArray(result.questions)) { const questionsReceived = result.questions as Question[]; if (questionsReceived.length > 0 || numQuestionsToRequest === 10) { toast({ title: "Success!", description: `${questionsReceived.length} ${typeTitle} questions generated.` }); setGeneratedQuestions(prev => ({ ...prev, [questionType]: questionsReceived })); } else { toast({ title: "No Questions", description: `AI returned 0 ${typeTitle} questions.`, variant: "default" }); setGeneratedQuestions(prev => ({ ...prev, [questionType]: [] })); } } else { throw new Error("Invalid question structure received."); } } catch (error: any) { const msg = error.message || `Unknown error.`; toast({ title: "Question Error", description: msg, variant: "destructive" }); setComponentError(msg); setGeneratedQuestions(prev => ({ ...prev, [questionType]: [] })); } finally { setIsGeneratingQuestions(prev => ({ ...prev, [questionType]: false })); setQuestionGenerationMessage(prev => ({ ...prev, [questionType]: null })); } };
 
 
-  // === PDF Download Handlers ===
   const handleDownloadNotesPdf = async () => {
     if (!generatedNotes.trim()) {
       toast({ title: "Cannot Download", description: "No notes generated.", variant: "destructive" });
       return;
     }
 
-    const generatingToastId = `generating-pdf-toast-${Date.now()}`;
-    toast({
-      id: generatingToastId,
+    const { id: generatingToastId, dismiss: dismissGeneratingToast } = toast({ // <-- Store dismiss function
       title: "Generating PDF...",
       description: "Please wait. This may take a few moments.",
-      duration: Infinity, // Persist until dismissed
+      duration: Infinity,
     });
 
     try {
@@ -140,33 +133,30 @@ const Dashboard: React.FC<DashboardProps> = ({
       }
 
       const captureContainer = document.createElement('div');
-      captureContainer.id = 'pdf-capture-container'; // For easier debugging
+      captureContainer.id = 'pdf-capture-container';
       captureContainer.style.position = 'absolute';
-      captureContainer.style.left = '-9999px';
-      captureContainer.style.top = '-9999px';
-      captureContainer.style.width = '800px'; // Adjust as needed for desired web layout capture
-      captureContainer.style.padding = '20px'; // Mimic some padding
+      captureContainer.style.left = '-9999px'; // Off-screen
+      captureContainer.style.top = '-9999px';  // Off-screen
+      captureContainer.style.width = '800px'; // A reasonable width for capture
+      captureContainer.style.padding = '20px';
       captureContainer.style.background = 'white'; // Important for non-transparent capture
-      // Apply dark mode class to capture container if app is in dark mode
       if (document.documentElement.classList.contains('dark')) {
         captureContainer.classList.add('dark');
       }
       document.body.appendChild(captureContainer);
-      
+
       const reactRoot = ReactDOM.createRoot(captureContainer);
       reactRoot.render(
-        <React.StrictMode> {/* Optional: For catching potential problems */}
-          {/* Apply the same prose wrapper you use in your visible component */}
+        <React.StrictMode>
           <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
                 table: ({ node, ...props }) => (
                   <div className="my-4 overflow-x-auto rounded-md border border-slate-300 dark:border-slate-700">
-                    <table {...props} className="w-full" /> {/* Use w-full to allow prose to manage width better */}
+                    <table {...props} className="w-full" />
                   </div>
                 ),
-                // You might need to explicitly style other elements if they don't capture well
               }}
             >
               {generatedNotes}
@@ -175,14 +165,13 @@ const Dashboard: React.FC<DashboardProps> = ({
         </React.StrictMode>
       );
 
-      // Wait for rendering and styles (crucial)
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Adjust delay if needed
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Increased delay slightly
 
-      const canvas = await html2canvas(captureContainer, {
-        scale: 2, // Higher scale for better resolution in PDF
-        useCORS: true, // If notes include external images
-        logging: process.env.NODE_ENV === 'development', // Enable logging only in dev
-        onclone: (documentClone) => { // Ensure dark mode propagates to cloned document for capture
+      const mainCanvas = await html2canvas(captureContainer, {
+        scale: 2,
+        useCORS: true,
+        logging: process.env.NODE_ENV === 'development',
+        onclone: (documentClone) => {
           if (document.documentElement.classList.contains('dark')) {
              documentClone.documentElement.classList.add('dark');
           } else {
@@ -190,26 +179,26 @@ const Dashboard: React.FC<DashboardProps> = ({
           }
         }
       });
-      
+
       reactRoot.unmount();
       document.body.removeChild(captureContainer);
 
-      const imgData = canvas.toDataURL('image/png');
       const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
       const pdfPageWidth = doc.internal.pageSize.getWidth();
       const pdfPageHeight = doc.internal.pageSize.getHeight();
       const margin = 40;
-      const contentWidth = pdfPageWidth - margin * 2;
 
-      const imgProps = doc.getImageProperties(imgData);
-      const imgAspectRatio = imgProps.width / imgProps.height;
-      const pdfImgWidth = contentWidth;
-      const pdfImgHeight = pdfImgWidth / imgAspectRatio;
+      const contentAreaWidth = pdfPageWidth - margin * 2;
+      
+      // Calculate image height in PDF units, maintaining aspect ratio
+      const mainCanvasAspectRatio = mainCanvas.width / mainCanvas.height;
+      const pdfFullImageWidth = contentAreaWidth; // Image will take full content width
+      const pdfFullImageHeight = pdfFullImageWidth / mainCanvasAspectRatio;
 
-      let accumulatedHeight = 0;
       let pageNumber = 0;
 
-      const addPageHeaderAndLogo = () => {
+      // Helper function to add header and logo, returns Y position for content
+      const addPageHeaderAndLogoToPdf = (): number => {
         pageNumber++;
         let currentY = margin;
         if (logoDataUrl) {
@@ -221,26 +210,25 @@ const Dashboard: React.FC<DashboardProps> = ({
         doc.setFontSize(14);
         const titleText = `Study Notes: ${subject || 'Unknown'} - Grade ${grade || 'N/A'}`;
         const titleX = margin;
-        // If logo is present and title might overlap, reduce title width
         const maxTitleWidth = logoDataUrl ? pdfPageWidth - margin * 2 - 40 : pdfPageWidth - margin * 2;
         const titleLines = doc.splitTextToSize(titleText, maxTitleWidth);
         doc.text(titleLines, titleX, currentY);
-        currentY += titleLines.length * 14 * 0.8 + 10; // Adjusted line height
+        currentY += titleLines.length * 14 * 0.8 + 10;
 
         doc.setLineWidth(0.5);
         doc.line(margin, currentY, pdfPageWidth - margin, currentY);
         currentY += 15;
-        return currentY;
+        return currentY; // This is the Y where actual page content (image segment) can start
       };
 
-      const addPageFooter = (currentPage: number, totalPages: number) => {
+      const addPageFooterToPdf = (currentPage: number, totalPages: number) => {
         let footerY = pdfPageHeight - margin;
         doc.setLineWidth(0.2);
-        doc.line(margin, footerY - 25, pdfPageWidth - margin, footerY - 25);
+        doc.line(margin, footerY - 25, pdfPageWidth - margin, footerY - 25); // Line above footer text
         doc.setFontSize(8);
         doc.setFont('helvetica', 'italic');
         
-        let footerLineOffset = -15;
+        let footerLineOffset = -15; // Y offset from bottom margin line
         if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) {
           doc.text(`Source Pages: ${startPage} - ${endPage}`, margin, footerY + footerLineOffset);
           footerLineOffset += 10;
@@ -248,52 +236,84 @@ const Dashboard: React.FC<DashboardProps> = ({
         doc.setTextColor(60, 60, 60);
         doc.text("Join Telegram: https://t.me/grade9to12ethiopia", margin, footerY + footerLineOffset);
         doc.setTextColor(0, 0, 0);
-        doc.text(`Page ${currentPage} of ${totalPages}`, pdfPageWidth - margin - doc.getTextWidth(`Page ${currentPage} of ${totalPages}`), footerY + footerLineOffset);
+        // Align page number to the right
+        const pageText = `Page ${currentPage} of ${totalPages}`;
+        doc.text(pageText, pdfPageWidth - margin - doc.getTextWidth(pageText), footerY + footerLineOffset);
       };
-      
-      // Estimate total pages for footer (this is an approximation before rendering all)
-      const estimatedTotalPages = Math.ceil(pdfImgHeight / (pdfPageHeight - addPageHeaderAndLogo() - margin - 30 /* footer space */));
 
-      let yPosInPDF = addPageHeaderAndLogo(); // Initial header on first page
+      let yOffsetOnMainCanvas = 0; // How much of the mainCanvas height we've processed (in mainCanvas pixels)
+      let initialYPosForContent = 0; // Y pos on PDF page where content starts (after header)
 
-      for (let i = 0; i < pdfImgHeight; i += (pdfPageHeight - yPosInPDF - margin - 30)) {
-        if (i > 0) { // Not the first iteration, so new page
-            doc.addPage();
-            yPosInPDF = addPageHeaderAndLogo();
+      // Estimate total pages (do this *after* one header call to know content space)
+      const tempDoc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' }); // Temporary for calc
+      const tempInitialYPos = addPageHeaderAndLogoToPdf.call({doc: tempDoc, pageNumber: 0, logoDataUrl, subject, grade, pdfPageWidth, margin}); // Call with context
+      const availableHeightPerPage = pdfPageHeight - tempInitialYPos - margin - 30; // 30 for footer space
+      const estimatedTotalPages = Math.ceil(pdfFullImageHeight / availableHeightPerPage) || 1;
+      pageNumber = 0; // Reset pageNumber for actual doc
+
+
+      initialYPosForContent = addPageHeaderAndLogoToPdf();
+
+      while (yOffsetOnMainCanvas < mainCanvas.height) {
+        if (pageNumber > 1) { // For pages after the first
+          doc.addPage();
+          initialYPosForContent = addPageHeaderAndLogoToPdf();
+        }
+
+        const contentHeightOnPdfPage = pdfPageHeight - initialYPosForContent - margin - 30; // 30 for footer space
+        const sourceSegmentHeightOnCanvas = Math.min(
+            mainCanvas.height - yOffsetOnMainCanvas, // Remaining height on main canvas
+            (contentHeightOnPdfPage / pdfFullImageWidth) * mainCanvas.width // Convert PDF height to canvas pixel height
+        );
+
+        if (sourceSegmentHeightOnCanvas <= 0) break; // No more content or space
+
+        // Create a temporary canvas for the current segment
+        const segmentCanvas = document.createElement('canvas');
+        segmentCanvas.width = mainCanvas.width; // Use full width of source
+        segmentCanvas.height = sourceSegmentHeightOnCanvas;
+        const segmentCtx = segmentCanvas.getContext('2d');
+        
+        if (segmentCtx) {
+            segmentCtx.drawImage(
+                mainCanvas,
+                0,                      // Source X from mainCanvas
+                yOffsetOnMainCanvas,    // Source Y from mainCanvas
+                mainCanvas.width,       // Source Width from mainCanvas
+                sourceSegmentHeightOnCanvas, // Source Height for this segment
+                0,                      // Destination X on segmentCanvas
+                0,                      // Destination Y on segmentCanvas
+                mainCanvas.width,       // Destination Width on segmentCanvas
+                sourceSegmentHeightOnCanvas // Destination Height on segmentCanvas
+            );
+
+            const segmentImgData = segmentCanvas.toDataURL('image/png');
+            const segmentPdfHeight = (segmentCanvas.height / segmentCanvas.width) * pdfFullImageWidth;
+
+            doc.addImage(
+              segmentImgData,
+              'PNG',
+              margin,
+              initialYPosForContent,
+              pdfFullImageWidth,
+              segmentPdfHeight // Height of this segment in PDF, maintaining aspect ratio
+            );
         }
         
-        const segmentHeight = Math.min(pdfImgHeight - accumulatedHeight, pdfPageHeight - yPosInPDF - margin - 30 /* footer space */);
-        if (segmentHeight <= 0) continue; // Avoid issues if no space left
-
-        doc.addImage(
-          imgData,
-          'PNG',
-          margin, // X
-          yPosInPDF, // Y
-          pdfImgWidth, // Width in PDF
-          segmentHeight, // Height of this segment in PDF
-          undefined, // alias
-          'FAST', // compression
-          0, // rotation
-          0, // source image crop x
-          accumulatedHeight * (imgProps.height / pdfImgHeight), // source image crop y (scaled to original canvas pixels)
-          imgProps.width, // source image crop width (full width of original canvas)
-          segmentHeight * (imgProps.height / pdfImgHeight) // source image crop height (segment height scaled to original canvas pixels)
-        );
-        accumulatedHeight += segmentHeight;
+        yOffsetOnMainCanvas += sourceSegmentHeightOnCanvas;
       }
-
+      
       const finalNumPages = doc.getNumberOfPages();
-      for(let i = 1; i <= finalNumPages; i++) {
+      for (let i = 1; i <= finalNumPages; i++) {
         doc.setPage(i);
-        addPageFooter(i, finalNumPages);
+        addPageFooterToPdf(i, finalNumPages);
       }
 
       const pageRangeString = (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) ? `_p${startPage}-${endPage}` : '';
       const filename = `${subject.replace(/ /g, '_') || 'Notes'}_Grade${grade || 'N_A'}${pageRangeString}_Notes_Visual.pdf`;
       doc.save(filename);
 
-      toast.dismiss(generatingToastId);
+      dismissGeneratingToast(); // <-- Call dismiss on the returned object
       toast({
         title: "Visual PDF Generated!",
         description: `${filename} downloading. Note: Text in this PDF is not selectable.`,
@@ -302,7 +322,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     } catch (error) {
       console.error("Error generating visual Notes PDF:", error);
-      toast.dismiss(generatingToastId);
+      dismissGeneratingToast(); // <-- Also dismiss on error
       toast({ title: "PDF Error", description: "Could not generate visual PDF. Check console for details.", variant: "destructive" });
     }
   };

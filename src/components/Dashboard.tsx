@@ -136,18 +136,20 @@ const Dashboard: React.FC<DashboardProps> = ({
       captureContainer.style.position = 'absolute';
       captureContainer.style.left = '-9999px'; // Off-screen rendering
       captureContainer.style.top = '-9999px';
-      captureContainer.style.width = '800px'; // Base width for capturing prose styles
+      captureContainer.style.width = '800px'; // A good base width for capturing prose styles
       captureContainer.style.padding = '20px'; // Match visual padding if any
-      captureContainer.style.background = 'white'; // Important for capture
-
+      captureContainer.style.background = 'white'; // Critical for html2canvas background
+      
+      // Propagate dark mode to the capture container if active
       if (document.documentElement.classList.contains('dark')) {
         captureContainer.classList.add('dark');
       }
       document.body.appendChild(captureContainer);
-
+      
       const reactRoot = ReactDOM.createRoot(captureContainer);
       reactRoot.render(
         <React.StrictMode>
+          {/* The wrapper with prose classes is crucial here for styling */}
           <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
@@ -157,7 +159,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <table {...props} className="w-full" />
                   </div>
                 ),
-                img: ({ node, ...props }) => <img {...props} crossOrigin="anonymous" />,
+                 // Potentially override other components for better capture if needed
+                img: ({node, ...props}) => <img {...props} crossOrigin="anonymous" />
               }}
             >
               {generatedNotes}
@@ -166,24 +169,28 @@ const Dashboard: React.FC<DashboardProps> = ({
         </React.StrictMode>
       );
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Ensure rendering and styles are fully applied before capture
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Adjust delay as needed
 
       const mainCanvas = await html2canvas(captureContainer, {
-        scale: 2,
-        useCORS: true,
+        scale: 2, // Higher scale improves resolution in the PDF
+        useCORS: true, // If notes might contain external images
         logging: process.env.NODE_ENV === 'development',
-        removeContainer: false, 
+        removeContainer: false, // Keep the container until explicitly removed,
         onclone: (clonedDoc) => {
+          // Ensure dark mode styling is correctly applied to the cloned document for capture
           if (document.documentElement.classList.contains('dark')) {
             clonedDoc.documentElement.classList.add('dark');
+            // Also add to body if your dark styles require it (e.g. for body background)
             clonedDoc.body.classList.add('dark'); 
           } else {
             clonedDoc.documentElement.classList.remove('dark');
             clonedDoc.body.classList.remove('dark');
           }
-        },
+        }
       });
-
+      
+      // Cleanup the temporary React root and DOM element
       reactRoot.unmount();
       document.body.removeChild(captureContainer);
 
@@ -191,14 +198,14 @@ const Dashboard: React.FC<DashboardProps> = ({
       const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
       const pdfPageWidth = doc.internal.pageSize.getWidth();
       const pdfPageHeight = doc.internal.pageSize.getHeight();
-      const pdfMargin = 40;
-      const footerHeightEstimate = 40; // Estimated space for footer (line + text + bottom margin space)
+      const pdfMargin = 40; // Renamed for clarity within this scope
+      const footerHeightEstimate = 40; // Estimated space needed for footer
       const contentWidth = pdfPageWidth - pdfMargin * 2;
 
       const imgOriginalWidth = mainCanvas.width;
       const imgOriginalHeight = mainCanvas.height;
       const imgAspectRatio = imgOriginalWidth / imgOriginalHeight;
-
+      
       const pdfImageRenderWidth = contentWidth;
       const pdfTotalImageHeight = pdfImageRenderWidth / imgAspectRatio;
 
@@ -206,146 +213,134 @@ const Dashboard: React.FC<DashboardProps> = ({
       let currentPageNum = 0; // Initialize page counter
 
       // ----- Helper Functions for Header/Footer -----
-      const addHeaderOnPage = (): number => {
+      const addHeaderOnPage = (): number => { // Add header to the current page context in 'doc'
           let headerY = pdfMargin;
           // Add logo
-          if (logoDataUrl) {
+          if (logoDataUrl) { 
               const logoW = 30, logoH = 30;
               doc.addImage(logoDataUrl, 'PNG', pdfPageWidth - pdfMargin - logoW, pdfMargin - 15, logoW, logoH);
               headerY = Math.max(headerY, pdfMargin - 15 + logoH + 10);
           }
-          // Add title text
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(14);
-          const titleText = `Study Notes: ${subject || 'Unknown'} - Grade ${grade || 'N/A'}`;
-          const maxTitleWidth = logoDataUrl ? pdfPageWidth - pdfMargin * 2 - 40 : pdfPageWidth - pdfMargin * 2;
-          const titleLines = doc.splitTextToSize(titleText, maxTitleWidth);
-          doc.text(titleLines, pdfMargin, headerY);
-          headerY += titleLines.length * 14 * 0.8 + 10; // Adjust line height spacing
+           // Add title text
+           doc.setFont('helvetica', 'bold');
+           doc.setFontSize(14);
+           const titleText = `Study Notes: ${subject || 'Unknown'} - Grade ${grade || 'N/A'}`;
+           const maxTitleWidth = logoDataUrl ? pdfPageWidth - pdfMargin * 2 - 40 : pdfPageWidth - pdfMargin * 2;
+           const titleLines = doc.splitTextToSize(titleText, maxTitleWidth);
+           doc.text(titleLines, pdfMargin, headerY);
+           headerY += titleLines.length * 14 * 0.8 + 10; 
           // Add header line
-          doc.setLineWidth(0.5);
-          doc.line(pdfMargin, headerY, pdfPageWidth - pdfMargin, headerY);
-          headerY += 15;
-          return headerY; // Return the Y position where content can start
+           doc.setLineWidth(0.5);
+           doc.line(pdfMargin, headerY, pdfPageWidth - pdfMargin, headerY);
+           headerY += 15;
+          return headerY; // Return the Y position where content can START
       };
-
-      const drawFooter = (pageNum: number, totalPages: number) => {
-          const footerStartY = pdfPageHeight - pdfMargin - footerHeightEstimate + 10; // Position footer drawing higher
+      
+      const drawFooter = (pageNum: number, totalPages: number) => { // Draw footer on the current page context
+          const footerStartY = pdfPageHeight - pdfMargin - footerHeightEstimate + 10; 
           doc.setLineWidth(0.2);
-          doc.line(pdfMargin, footerStartY, pdfPageWidth - pdfMargin, footerStartY); // Line above footer
+          doc.line(pdfMargin, footerStartY, pdfPageWidth - pdfMargin, footerStartY); 
           doc.setFontSize(8);
           doc.setFont('helvetica', 'italic');
-          let currentFooterY = footerStartY + 15; // Start text below the line
+          let currentFooterY = footerStartY + 15; 
 
           if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) {
               doc.text(`Source Pages: ${startPage} - ${endPage}`, pdfMargin, currentFooterY);
+              currentFooterY += 10; // Move down only if source page info was added
           }
-          // Align page number right
-          const pageText = `Page ${pageNum} of ${totalPages}`;
-          doc.text(pageText, pdfPageWidth - pdfMargin - doc.getTextWidth(pageText), currentFooterY);
-          currentFooterY += 10; // Move Y for next line
           doc.setTextColor(60, 60, 60);
           doc.text("Join Telegram: https://t.me/grade9to12ethiopia", pdfMargin, currentFooterY);
           doc.setTextColor(0, 0, 0); // Reset color
+          const pageText = `Page ${pageNum} of ${totalPages}`;
+          doc.text(pageText, pdfPageWidth - pdfMargin - doc.getTextWidth(pageText), currentFooterY);
       };
       // ----- End Header/Footer Helpers -----
 
 
       // --- Refined Pagination Loop ---
       while (sourceImageYOffset < imgOriginalHeight) {
-          currentPageNum++; // Increment page number for the page we are about to add
+          currentPageNum++; 
           if (currentPageNum > 1) {
               doc.addPage();
           }
-          doc.setPage(currentPageNum); // Ensure drawing context is the current page
+          doc.setPage(currentPageNum); // Set current page context
 
-          const contentStartY = addHeaderOnPage(); // Draw header, get Y start for content
+          const contentStartY = addHeaderOnPage(); // Draw header, get Y start
 
-          // Calculate height available for image segment on *this* PDF page
-          const availablePdfHeightForImage = pdfPageHeight - contentStartY - pdfMargin - footerHeightEstimate;
+          const availablePdfHeightForImage = pdfPageHeight - contentStartY - pdfMargin - footerHeightEstimate; 
 
           if (availablePdfHeightForImage <= 0) {
-              console.warn("Not enough space for content on page", currentPageNum, "after header/footer estimation.");
-              if (currentPageNum > 20) { // Safety break
-                  console.error("Aborting PDF generation due to potential infinite loop.");
-                  break;
-              }
-              continue; // Skip to next page cycle if header/footer take too much space
+            console.warn("Not enough space for content on page", currentPageNum, "after header/footer estimation.");
+            if (currentPageNum > 50) { // Increased safety break
+                  console.error("Aborting PDF generation due to excessive pages or layout issue.");
+                  throw new Error("PDF generation aborted due to possible layout error.")
+            }
+            continue; 
           }
 
-          // Calculate the height of the segment to crop from the *source* canvas (in pixels)
           const scaleFactor = pdfImageRenderWidth / imgOriginalWidth;
           let segmentSourceHeight = availablePdfHeightForImage / scaleFactor;
-
-          // Don't crop more than what's remaining on the source canvas
           segmentSourceHeight = Math.min(segmentSourceHeight, imgOriginalHeight - sourceImageYOffset);
 
           if (segmentSourceHeight <= 0) {
-              console.warn("Calculated segmentSourceHeight is zero or negative. Ending pagination.");
-              break; // No more source image height left to process
+             console.log("Ending pagination loop: calculated segment height is zero or negative.");
+              break;
           }
 
-          // Create temporary canvas for the segment
           const segmentCanvas = document.createElement('canvas');
           segmentCanvas.width = imgOriginalWidth;
           segmentCanvas.height = segmentSourceHeight;
           const segmentCtx = segmentCanvas.getContext('2d');
 
           if (segmentCtx) {
-              // Crop and draw the segment from the main canvas
               segmentCtx.drawImage(
                   mainCanvas,
-                  0, sourceImageYOffset, imgOriginalWidth, segmentSourceHeight, // Source crop rect
-                  0, 0, imgOriginalWidth, segmentSourceHeight                     // Dest rect on segmentCanvas
+                  0, sourceImageYOffset, imgOriginalWidth, segmentSourceHeight, 
+                  0, 0, imgOriginalWidth, segmentSourceHeight
               );
 
               const segmentDataUrl = segmentCanvas.toDataURL('image/png');
-              const segmentPdfHeight = segmentSourceHeight * scaleFactor; // Actual height in PDF
+              const segmentPdfHeight = segmentSourceHeight * scaleFactor;
 
-              // Add the segment image to the current PDF page
               doc.addImage(
                   segmentDataUrl,
                   'PNG',
-                  pdfMargin,           // PDF X
-                  contentStartY,       // PDF Y (start after header)
-                  pdfImageRenderWidth, // PDF Width
-                  segmentPdfHeight     // PDF Height
+                  pdfMargin, contentStartY, pdfImageRenderWidth, segmentPdfHeight
               );
           }
 
-          // Advance the offset on the source canvas
           sourceImageYOffset += segmentSourceHeight;
       }
       // --- End Refined Pagination Loop ---
 
-      // Add footers to all pages now that total is known
+      // Add footers to all pages
       const totalPages = doc.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
-          doc.setPage(i); // Set context to the specific page
+          doc.setPage(i);
           drawFooter(i, totalPages);
       }
-
+      
       // Save and provide feedback
-      const pageRangeString = (startPage && endPage) ? `_p${startPage}-${endPage}` : '';
-      const filename = `${subject.replace(/ /g, '_') || 'Notes'}_Grade${grade || 'N_A'}${pageRangeString}_Notes_Visual.pdf`;
-      doc.save(filename);
+       const pageRangeString = (startPage && endPage) ? `_p${startPage}-${endPage}` : '';
+       const filename = `${subject.replace(/ /g, '_') || 'Notes'}_Grade${grade || 'N_A'}${pageRangeString}_Notes_Visual.pdf`;
+       doc.save(filename);
 
-      dismissGeneratingToast();
-      toast({
-        title: "Visual PDF Generated!",
-        description: `${filename} downloading. Text is not selectable.`,
-        duration: 7000
-      });
+       dismissGeneratingToast();
+       toast({
+         title: "Visual PDF Generated!",
+         description: `${filename} downloading. Text is not selectable.`,
+         duration: 7000
+       });
 
     } catch (error) {
       console.error("Error generating visual Notes PDF:", error);
       dismissGeneratingToast();
-      toast({ title: "PDF Error", description: "Could not generate visual PDF. Check console.", variant: "destructive" });
+      toast({ title: "PDF Error", description: "Could not generate visual PDF. Check console for details.", variant: "destructive" });
     }
   };
 
 
-  // --- handleDownloadQuestionsPdf (Remains text-based) ---
+  // --- handleDownloadQuestionsPdf (With fontSize fix and refined pagination) ---
   const handleDownloadQuestionsPdf = async () => {
     const questionsToDownload = generatedQuestions[activeQuestionTab]; const currentQuestionTypeTitle = questionTypeTitles[activeQuestionTab];
     if (!questionsToDownload || questionsToDownload.length === 0) { toast({ title: "Cannot Download", description: `No ${currentQuestionTypeTitle} questions generated.`, variant: "destructive"}); return; }
@@ -359,7 +354,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         const contentEndY = pageHeight - pdfMargin - footerBuffer;
 
         let currentPageNumForQuestions = 1;
-        let totalEstPagesForQuestions = 1;
+        let totalEstPagesForQuestions = 1; // Estimate, will correct later
 
         // Add Header Helper
         const addLogoAndQuestionHeader = (currentDoc: jsPDF): number => {
@@ -394,7 +389,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             const pw = currentDoc.internal.pageSize.width;
             const m = pdfMargin;
 
-            let footerStartY = ph - m - footerBuffer + 10; // Start footer drawing higher
+            let footerStartY = ph - m - footerBuffer + 10;
             currentDoc.setLineWidth(0.2);
             currentDoc.line(m, footerStartY, pw - m, footerStartY);
             let currentFooterY = footerStartY + 15;
@@ -414,7 +409,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         // Add Text with Paging Helper
         const addTextToQuestionsPdf = (currentDoc: jsPDF, text: string | undefined | null, x: number, currentY: number, options?: any): number => {
             if (!text || !text.trim()) return currentY;
-            const fontSize = options?.fontSize || 10;
+            const fontSize = options?.fontSize || 10; // Default fontSize is 10 here
             const fontStyle = options?.fontStyle || 'normal';
             const qLineHeight = fontSize * 1.2;
             const textMaxWidth = options?.maxWidth || maxLineWidth;
@@ -430,7 +425,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     addQuestionFooter(currentDoc, currentPageNumForQuestions, totalEstPagesForQuestions); // Footer on current page
                     currentDoc.addPage();
                     currentPageNumForQuestions++;
-                    totalEstPagesForQuestions = Math.max(totalEstPagesForQuestions, currentPageNumForQuestions);
+                    totalEstPagesForQuestions = Math.max(totalEstPagesForQuestions, currentPageNumForQuestions); // Update estimate as we add pages
                     tempY = addLogoAndQuestionHeader(currentDoc); // Header on new page
                     currentDoc.setFontSize(fontSize); // Re-apply font settings for new page context
                     currentDoc.setFont('helvetica', fontStyle);
@@ -445,23 +440,31 @@ const Dashboard: React.FC<DashboardProps> = ({
         yPos = addLogoAndQuestionHeader(doc); // Initial header on first page
 
         questionsToDownload.forEach((q, index) => {
-            let questionStartY = yPos; // Track where the question starts for page break check
+            let questionStartY = yPos; // Track where the question starts for complex break checks
 
+            // Add Question Text
             yPos = addTextToQuestionsPdf(doc, `${index + 1}. ${q.question || 'Missing Question Text'}`, pdfMargin, yPos, { fontStyle: 'bold' });
 
+            // Add MCQ Options if applicable
             if (activeQuestionTab === 'multiple-choice' && q.options && q.options.length === 4) {
                 q.options.forEach((opt, optIndex) => {
-                     // Add check here too, in case options cause overflow
                      const tempYBeforeOption = yPos;
-                     const estOptionHeight = (options?.fontSize || 10) * 1.2 + 5; // Estimate height needed for one option
-                     if(tempYBeforeOption + estOptionHeight > contentEndY && index < questionsToDownload.length - 1) { // If options will overflow
+                     // Corrected Fix: Use the default size that addTextToQuestionsPdf will use
+                     const defaultOptionFontSize = 10; 
+                     const estOptionHeight = (defaultOptionFontSize * 1.2) + 5; // Estimate includes line height + gap
+
+                     // Check if adding this option would overflow *and* require rerendering the question header on a new page
+                     if (tempYBeforeOption + estOptionHeight > contentEndY) { 
                           addQuestionFooter(doc, currentPageNumForQuestions, totalEstPagesForQuestions);
                           doc.addPage();
                           currentPageNumForQuestions++;
                           totalEstPagesForQuestions = Math.max(totalEstPagesForQuestions, currentPageNumForQuestions);
                           yPos = addLogoAndQuestionHeader(doc); // Redraw header
                           questionStartY = yPos; // Reset question start Y
-                          yPos = addTextToQuestionsPdf(doc, `${index + 1}. ${q.question || 'Missing Question Text'}`, pdfMargin, yPos, { fontStyle: 'bold' }); // Re-render question start
+                          // Re-render question ONLY if it started on the previous page or very close to top
+                          if (questionStartY <= pdfMargin + 50) { // Threshold might need adjustment
+                             yPos = addTextToQuestionsPdf(doc, `${index + 1}. ${q.question || 'Missing Question Text'}`, pdfMargin, yPos, { fontStyle: 'bold' });
+                          } // otherwise assume question text is fully visible already
                      }
 
                     const letter = getCorrectAnswerLetter(optIndex);
@@ -471,91 +474,88 @@ const Dashboard: React.FC<DashboardProps> = ({
             }
             yPos += 2; // Space before answer/explanation
 
+            // Determine Answer Text
             let answerText = 'Answer: Not provided';
             if (activeQuestionTab !== 'multiple-choice' && q.answer) { answerText = `Answer: ${q.answer}`; }
-            else if (activeQuestionTab === 'multiple-choice') {
+            else if (activeQuestionTab === 'multiple-choice') { 
                 let pdfCorrectLetter = null; if (typeof q.answer === 'string' && /^[A-D]$/i.test(q.answer) && typeof q.correctAnswerIndex === 'number') { pdfCorrectLetter = q.answer.toUpperCase(); } else if (q.options) { const derivedIndex = q.options.findIndex(o => typeof o === 'string' && o.includes('✓')); if (derivedIndex !== -1) { pdfCorrectLetter = getCorrectAnswerLetter(derivedIndex); } } if (pdfCorrectLetter) { answerText = `Correct Answer: ${pdfCorrectLetter}`; } else { answerText = `Correct Answer: Could not determine`; }
             }
-             if (yPos + 20 > contentEndY && questionStartY < contentEndY ) { // Check if answer will overflow page
+
+            // Estimate height needed for answer + explanation before drawing them
+             const answerLines = doc.splitTextToSize(answerText, maxLineWidth - 15);
+             const explanationLines = q.explanation ? doc.splitTextToSize(`Explanation: ${q.explanation}`, maxLineWidth - 15) : [];
+             const approxAnswerExplanationHeight = (answerLines.length + explanationLines.length) * (10*1.2) + 10; // Using default size 10
+            
+            // Check if answer/explanation block will overflow page AND question started on this page
+             if (yPos + approxAnswerExplanationHeight > contentEndY && questionStartY < contentEndY) { 
                    addQuestionFooter(doc, currentPageNumForQuestions, totalEstPagesForQuestions);
                    doc.addPage();
                    currentPageNumForQuestions++;
                    totalEstPagesForQuestions = Math.max(totalEstPagesForQuestions, currentPageNumForQuestions);
                    yPos = addLogoAndQuestionHeader(doc); // Redraw header
                    questionStartY = yPos; // Reset question start Y
-                   yPos = addTextToQuestionsPdf(doc, `${index + 1}. ${q.question || 'Missing Question Text'}`, pdfMargin, yPos, { fontStyle: 'bold' }); // Re-render question start
-                    if (activeQuestionTab === 'multiple-choice' && q.options && q.options.length === 4) { // Re-render options
-                       q.options.forEach((opt, optIndex) => { /* ...render options again ... */ 
+                   // Re-render question and options
+                   yPos = addTextToQuestionsPdf(doc, `${index + 1}. ${q.question || 'Missing Question Text'}`, pdfMargin, yPos, { fontStyle: 'bold' }); 
+                    if (activeQuestionTab === 'multiple-choice' && q.options && q.options.length === 4) { 
+                       q.options.forEach((opt, optIndex) => { 
                           const letter = getCorrectAnswerLetter(optIndex);
                           const cleanedOpt = typeof opt === 'string' ? opt.replace(/✓/g, '').trim() : opt;
                           yPos = addTextToQuestionsPdf(doc, `${letter}) ${cleanedOpt || 'Missing Option'}`, pdfMargin + 15, yPos, { maxWidth: maxLineWidth - 15 });
                        });
                      }
+                   yPos +=2; // Space before answer
              }
-            yPos = addTextToQuestionsPdf(doc, answerText, pdfMargin + 15, yPos, { fontStyle: 'italic', maxWidth: maxLineWidth - 15 });
 
+            // Draw Answer Text
+            yPos = addTextToQuestionsPdf(doc, answerText, pdfMargin + 15, yPos, { fontStyle: 'italic', maxWidth: maxLineWidth - 15 });
+            
+            // Draw Explanation Text
             if (q.explanation) {
-                 if (yPos + 20 > contentEndY && questionStartY < contentEndY) { // Check if explanation will overflow page
-                       addQuestionFooter(doc, currentPageNumForQuestions, totalEstPagesForQuestions);
-                       doc.addPage();
-                       currentPageNumForQuestions++;
-                       totalEstPagesForQuestions = Math.max(totalEstPagesForQuestions, currentPageNumForQuestions);
-                       yPos = addLogoAndQuestionHeader(doc); // Redraw header
-                       questionStartY = yPos; // Reset question start Y
-                        // Re-render entire question block (simplest robust way for complex breaks)
-                       yPos = addTextToQuestionsPdf(doc, `${index + 1}. ${q.question || 'Missing Question Text'}`, pdfMargin, yPos, { fontStyle: 'bold' }); 
-                        if (activeQuestionTab === 'multiple-choice' && q.options && q.options.length === 4) { 
-                            q.options.forEach((opt, optIndex) => { /* ...render options again ... */
-                              const letter = getCorrectAnswerLetter(optIndex);
-                              const cleanedOpt = typeof opt === 'string' ? opt.replace(/✓/g, '').trim() : opt;
-                              yPos = addTextToQuestionsPdf(doc, `${letter}) ${cleanedOpt || 'Missing Option'}`, pdfMargin + 15, yPos, { maxWidth: maxLineWidth - 15 });
-                            }); 
-                         }
-                        yPos += 2;
-                        yPos = addTextToQuestionsPdf(doc, answerText, pdfMargin + 15, yPos, { fontStyle: 'italic', maxWidth: maxLineWidth - 15 });
-                 }
                 yPos = addTextToQuestionsPdf(doc, `Explanation: ${q.explanation}`, pdfMargin + 15, yPos, { fontStyle: 'italic', maxWidth: maxLineWidth - 15 });
             }
-
+            
             yPos += 8; // Space after the question block
 
-            // Check for adding separator ONLY IF not the last item
+            // Add separator line or page break before next question
             if (index < questionsToDownload.length - 1) {
-                const estNextItemMinHeight = 30; // Minimum estimated height for next q/separator
-                if (yPos + estNextItemMinHeight > contentEndY) { // If separator/next item likely overflows
+                const estNextItemMinHeight = 30; // Estimate min height for next question text
+                if (yPos + estNextItemMinHeight > contentEndY) { 
                     addQuestionFooter(doc, currentPageNumForQuestions, totalEstPagesForQuestions);
                     doc.addPage();
                     currentPageNumForQuestions++;
                     totalEstPagesForQuestions = Math.max(totalEstPagesForQuestions, currentPageNumForQuestions);
-                    yPos = addLogoAndQuestionHeader(doc); // Start fresh on new page
+                    yPos = addLogoAndQuestionHeader(doc); 
                 } else {
-                    // Add separator line if space permits
                     doc.setLineWidth(0.2);
                     doc.line(pdfMargin, yPos, pageWidth - pdfMargin, yPos);
-                    yPos += 10;
+                    yPos += 10; // Space after separator
                 }
             }
         });
 
-        // Add footer to the very last page
-        addQuestionFooter(doc, currentPageNumForQuestions, totalEstPagesForQuestions);
-
-        // Go back and update total page numbers in all footers
-        const finalTotalPages = currentPageNumForQuestions; // Now we know the actual total
-        for (let i = 1; i <= finalTotalPages; i++) {
-            doc.setPage(i);
-            addQuestionFooter(doc, i, finalTotalPages);
+        // Add footer to the final page
+        const finalTotalPages = currentPageNumForQuestions; 
+        addQuestionFooter(doc, finalTotalPages, finalTotalPages); 
+        
+        // Loop back to fix total pages in earlier footers
+        if (finalTotalPages > 1) {
+            for (let i = 1; i < finalTotalPages; i++) {
+                doc.setPage(i);
+                addQuestionFooter(doc, i, finalTotalPages);
+            }
         }
+
 
         const pageRangeString = (startPage && endPage) ? `_p${startPage}-${endPage}` : '';
         const filename = `${subject.replace(/ /g, '_') || 'Questions'}_Grade${grade || 'N_A'}${pageRangeString}_${activeQuestionTab}_Questions.pdf`;
         doc.save(filename);
         toast({ title: "Download Started", description: `Downloading ${filename}` });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error generating Questions PDF:", error);
-        toast({ title: "PDF Error", description: "Could not generate Questions PDF. Check console.", variant: "destructive" });
+        toast({ title: "PDF Error", description: error.message || "Could not generate Questions PDF.", variant: "destructive" });
     }
  };
+
 
   // === Main Component Render ===
   return (
@@ -661,3 +661,4 @@ const Dashboard: React.FC<DashboardProps> = ({
 };
 
 export default Dashboard;
+

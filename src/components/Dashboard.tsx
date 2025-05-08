@@ -2,29 +2,24 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import ReactDOM from 'react-dom/client'; // <-- IMPORT FOR REACT 18+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   generateStudyQuestions,
   GenerateStudyQuestionsInput,
-  // GenerateStudyQuestionsOutput, // Not used in this snippet, commented for brevity
+  GenerateStudyQuestionsOutput,
 } from '@/ai/flows/generate-study-questions';
-import { generateNotes, 
-    // GenerateNotesOutput  // Not used in this snippet
-} from '@/ai/flows/generate-notes';
+import { generateNotes, GenerateNotesOutput } from '@/ai/flows/generate-notes';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { jsPDF } from "jspdf";
-import ReactMarkdown from 'react-markdown';
+import { jsPDF, TextOptionsLight } from "jspdf";
+import ReactMarkdown, { Components } from 'react-markdown'; // Import Components type if needed for customization
 import remarkGfm from 'remark-gfm';
 import { Eye, EyeOff, Loader2, AlertCircle, FileText, HelpCircle, ListChecks, Sparkles, Download } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { loadImageData } from '@/lib/imageUtils';
-import html2canvas from 'html2canvas'; // <-- IMPORT HTML2CANVAS
+import { loadImageData } from '@/lib/imageUtils'; // Import the helper function
 
-// ... (Constants and Types, Helper Functions, Props Interface remain the same) ...
 // --- Constants and Types ---
 type ExplicitQuestionTypeValue =
   | 'multiple-choice'
@@ -63,18 +58,19 @@ interface DashboardProps {
   chapterContent: string;
   subject: string;
   grade: string;
-  startPage?: number;
+  startPage?: number; // Page numbers are optional props received from parent
   endPage?: number;
 }
 
-
+// --- Component ---
 const Dashboard: React.FC<DashboardProps> = ({
   chapterContent: initialChapterContent,
   subject,
   grade,
-  startPage,
+  startPage, // Destructure page numbers
   endPage
 }) => {
+  // === State ===
   const [chapterContent, setChapterContent] = useState(initialChapterContent);
   const [generatedNotes, setGeneratedNotes] = useState('');
   const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
@@ -87,6 +83,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [activeQuestionTab, setActiveQuestionTab] = useState<CurrentQuestionTypeValue>('multiple-choice');
   const { toast } = useToast();
 
+  // === Memos & Effects ===
   const initialQuestionState = useMemo(() => createInitialRecordState(availableQuestionTypes, []), []);
   const initialLoadingState = useMemo(() => createInitialRecordState(availableQuestionTypes, false), []);
   const initialMessageState = useMemo(() => createInitialRecordState<string | null>(availableQuestionTypes, null), []);
@@ -94,10 +91,12 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   useEffect(() => { setChapterContent(initialChapterContent); setGeneratedNotes(''); setIsGeneratingNotes(false); setNoteGenerationMessage(null); setGeneratedQuestions(initialQuestionState); setIsGeneratingQuestions(initialLoadingState); setQuestionGenerationMessage(initialMessageState); setShowAnswer(initialShowAnswerState); setComponentError(null); setActiveQuestionTab('multiple-choice'); }, [initialChapterContent, subject, grade, initialQuestionState, initialLoadingState, initialMessageState, initialShowAnswerState]);
 
+  // === Helpers ===
   const getCorrectAnswerLetter = (index?: number): string | null => { if (typeof index !== 'number' || index < 0 || index > 3) return null; return String.fromCharCode(65 + index); };
   const toggleShowAnswer = ( questionType: CurrentQuestionTypeValue, index: number ) => { setShowAnswer((prev) => { const current = prev[questionType] ?? {}; return { ...prev, [questionType]: { ...current, [index]: !current[index] } }; }); };
   const validateInputs = (): boolean => { setComponentError(null); let isValid = true; let errorMsg = ''; if (!subject || !grade) { errorMsg = 'Grade & Subject required.'; isValid = false; } else if (!chapterContent || chapterContent.trim().length < 20) { errorMsg = 'Chapter content missing or too short.'; isValid = false; } if (!isValid) { toast({ title: 'Input Missing', description: errorMsg, variant: 'destructive' }); setComponentError(errorMsg); } return isValid; };
 
+  // === Renderers ===
   const renderInlineFormatting = (text: string | null | undefined): string => { if (!text) return ''; let html = text; html = html.replace(/</g, '<').replace(/>/g, '>'); html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'); html = html.replace(/__(.*?)__/g, '<strong>$1</strong>'); html = html.replace(/(?<!\w)\*(?!\s)(.+?)(?<!\s)\*(?!\w)/g, '<em>$1</em>'); html = html.replace(/(?<!\w)_(?!\s)(.+?)(?<!\s)_(?!\w)/g, '<em>$1</em>'); html = html.replace(/`(.*?)`/g, '<code class="bg-muted text-muted-foreground px-1 py-0.5 rounded font-mono text-sm">$1</code>'); html = html.replace(/__+/g, '<span class="italic text-muted-foreground">[blank]</span>'); return html; };
   const renderQuestionContent = ( questionType: CurrentQuestionTypeValue, question: Question, index: number ): React.ReactNode => {
     const isShowingAnswer = showAnswer[questionType]?.[index] || false;
@@ -108,365 +107,156 @@ const Dashboard: React.FC<DashboardProps> = ({
     else { return ( <div className="mt-2 md:mt-3"> <RevealButton /> {isShowingAnswer && <AnswerReveal derivedLetter={null} originalLetter={null} />} </div> ); }
   };
 
+  // === Generation Handlers ===
   const handleGenerateNotes = async () => { if (!validateInputs()) return; setGeneratedNotes(''); setIsGeneratingNotes(true); setNoteGenerationMessage("AI generating notes..."); try { const result = await generateNotes({ textbookChapter: chapterContent, gradeLevel: `${grade}th Grade`, subject: subject }); if (result?.notes?.trim()) { setGeneratedNotes(result.notes); toast({ title: "Success!", description: "Notes generated." }); } else { throw new Error("AI returned empty notes."); } } catch (error: any) { const msg = error.message || 'Unknown error.'; toast({ title: "Notes Error", description: msg, variant: "destructive" }); setComponentError(msg); setGeneratedNotes(''); } finally { setIsGeneratingNotes(false); setNoteGenerationMessage(null); } };
   const handleGenerateQuestions = async (questionType: CurrentQuestionTypeValue) => { if (!validateInputs()) return; const typeTitle = questionTypeTitles[questionType]; setGeneratedQuestions(prev => ({ ...prev, [questionType]: [] })); setShowAnswer(prev => ({ ...prev, [questionType]: {} })); setIsGeneratingQuestions(prev => ({ ...prev, [questionType]: true })); setQuestionGenerationMessage(prev => ({ ...prev, [questionType]: `AI generating ${typeTitle}...` })); setComponentError(null); try { const numQuestionsToRequest = 10; const inputData: GenerateStudyQuestionsInput = { chapterContent: chapterContent, questionType: questionType, numberOfQuestions: numQuestionsToRequest, gradeLevel: `${grade}th Grade`, subject: subject }; const result = await generateStudyQuestions(inputData); if (result?.questions && Array.isArray(result.questions)) { const questionsReceived = result.questions as Question[]; if (questionsReceived.length > 0 || numQuestionsToRequest === 10) { toast({ title: "Success!", description: `${questionsReceived.length} ${typeTitle} questions generated.` }); setGeneratedQuestions(prev => ({ ...prev, [questionType]: questionsReceived })); } else { toast({ title: "No Questions", description: `AI returned 0 ${typeTitle} questions.`, variant: "default" }); setGeneratedQuestions(prev => ({ ...prev, [questionType]: [] })); } } else { throw new Error("Invalid question structure received."); } } catch (error: any) { const msg = error.message || `Unknown error.`; toast({ title: "Question Error", description: msg, variant: "destructive" }); setComponentError(msg); setGeneratedQuestions(prev => ({ ...prev, [questionType]: [] })); } finally { setIsGeneratingQuestions(prev => ({ ...prev, [questionType]: false })); setQuestionGenerationMessage(prev => ({ ...prev, [questionType]: null })); } };
 
-
+  // === PDF Download Handlers (Corrected Scope and Markdown Processing) ===
   const handleDownloadNotesPdf = async () => {
-    if (!generatedNotes.trim()) {
-      toast({ title: "Cannot Download", description: "No notes generated.", variant: "destructive" });
-      return;
-    }
-
-    const { id: generatingToastId, dismiss: dismissGeneratingToast } = toast({ // <-- Store dismiss function
-      title: "Generating PDF...",
-      description: "Please wait. This may take a few moments.",
-      duration: Infinity,
-    });
+    if (!generatedNotes.trim()) { toast({ title: "Cannot Download", description: "No notes generated.", variant: "destructive"}); return; }
 
     try {
       let logoDataUrl: string | null = null;
-      try {
-        logoDataUrl = await loadImageData('/logo.png');
-      } catch (imgError: any) {
-        console.warn("Could not load logo for PDF:", imgError.message);
-      }
-
-      const captureContainer = document.createElement('div');
-      captureContainer.id = 'pdf-capture-container';
-      captureContainer.style.position = 'absolute';
-      captureContainer.style.left = '-9999px'; // Off-screen
-      captureContainer.style.top = '-9999px';  // Off-screen
-      captureContainer.style.width = '800px'; // A reasonable width for capture
-      captureContainer.style.padding = '20px';
-      captureContainer.style.background = 'white'; // Important for non-transparent capture
-      if (document.documentElement.classList.contains('dark')) {
-        captureContainer.classList.add('dark');
-      }
-      document.body.appendChild(captureContainer);
-
-      const reactRoot = ReactDOM.createRoot(captureContainer);
-      reactRoot.render(
-        <React.StrictMode>
-          <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                table: ({ node, ...props }) => (
-                  <div className="my-4 overflow-x-auto rounded-md border border-slate-300 dark:border-slate-700">
-                    <table {...props} className="w-full" />
-                  </div>
-                ),
-              }}
-            >
-              {generatedNotes}
-            </ReactMarkdown>
-          </div>
-        </React.StrictMode>
-      );
-
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Increased delay slightly
-
-      const mainCanvas = await html2canvas(captureContainer, {
-        scale: 2,
-        useCORS: true,
-        logging: process.env.NODE_ENV === 'development',
-        onclone: (documentClone) => {
-          if (document.documentElement.classList.contains('dark')) {
-             documentClone.documentElement.classList.add('dark');
-          } else {
-             documentClone.documentElement.classList.remove('dark');
-          }
-        }
-      });
-
-      reactRoot.unmount();
-      document.body.removeChild(captureContainer);
+      try { logoDataUrl = await loadImageData('/logo.png'); }
+      catch (imgError: any) { console.warn("Could not load logo for PDF:", imgError.message); }
 
       const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
-      const pdfPageWidth = doc.internal.pageSize.getWidth();
-      const pdfPageHeight = doc.internal.pageSize.getHeight();
+      const pageHeight = doc.internal.pageSize.height;
+      const pageWidth = doc.internal.pageSize.width;
       const margin = 40;
+      const maxLineWidth = pageWidth - margin * 2;
+      let yPos = margin;
+      const footerStartY = pageHeight - margin - 30; // Start footer content higher up
 
-      const contentAreaWidth = pdfPageWidth - margin * 2;
-      
-      // Calculate image height in PDF units, maintaining aspect ratio
-      const mainCanvasAspectRatio = mainCanvas.width / mainCanvas.height;
-      const pdfFullImageWidth = contentAreaWidth; // Image will take full content width
-      const pdfFullImageHeight = pdfFullImageWidth / mainCanvasAspectRatio;
+      let logoX = 0, logoY = 0, logoWidth = 0, logoHeight = 0;
 
-      let pageNumber = 0;
-
-      // Helper function to add header and logo, returns Y position for content
-      const addPageHeaderAndLogoToPdf = (): number => {
-        pageNumber++;
-        let currentY = margin;
-        if (logoDataUrl) {
-          const logoW = 30; const logoH = 30;
-          doc.addImage(logoDataUrl, 'PNG', pdfPageWidth - margin - logoW, margin - 15, logoW, logoH);
-          currentY = Math.max(currentY, margin - 15 + logoH + 10);
-        }
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(14);
-        const titleText = `Study Notes: ${subject || 'Unknown'} - Grade ${grade || 'N/A'}`;
-        const titleX = margin;
-        const maxTitleWidth = logoDataUrl ? pdfPageWidth - margin * 2 - 40 : pdfPageWidth - margin * 2;
-        const titleLines = doc.splitTextToSize(titleText, maxTitleWidth);
-        doc.text(titleLines, titleX, currentY);
-        currentY += titleLines.length * 14 * 0.8 + 10;
-
-        doc.setLineWidth(0.5);
-        doc.line(margin, currentY, pdfPageWidth - margin, currentY);
-        currentY += 15;
-        return currentY; // This is the Y where actual page content (image segment) can start
-      };
-
-      const addPageFooterToPdf = (currentPage: number, totalPages: number) => {
-        let footerY = pdfPageHeight - margin;
-        doc.setLineWidth(0.2);
-        doc.line(margin, footerY - 25, pdfPageWidth - margin, footerY - 25); // Line above footer text
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'italic');
-        
-        let footerLineOffset = -15; // Y offset from bottom margin line
-        if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) {
-          doc.text(`Source Pages: ${startPage} - ${endPage}`, margin, footerY + footerLineOffset);
-          footerLineOffset += 10;
-        }
-        doc.setTextColor(60, 60, 60);
-        doc.text("Join Telegram: https://t.me/grade9to12ethiopia", margin, footerY + footerLineOffset);
-        doc.setTextColor(0, 0, 0);
-        // Align page number to the right
-        const pageText = `Page ${currentPage} of ${totalPages}`;
-        doc.text(pageText, pdfPageWidth - margin - doc.getTextWidth(pageText), footerY + footerLineOffset);
-      };
-
-      let yOffsetOnMainCanvas = 0; // How much of the mainCanvas height we've processed (in mainCanvas pixels)
-      let initialYPosForContent = 0; // Y pos on PDF page where content starts (after header)
-
-      // Estimate total pages (do this *after* one header call to know content space)
-      const tempDoc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' }); // Temporary for calc
-      const tempInitialYPos = addPageHeaderAndLogoToPdf.call({doc: tempDoc, pageNumber: 0, logoDataUrl, subject, grade, pdfPageWidth, margin}); // Call with context
-      const availableHeightPerPage = pdfPageHeight - tempInitialYPos - margin - 30; // 30 for footer space
-      const estimatedTotalPages = Math.ceil(pdfFullImageHeight / availableHeightPerPage) || 1;
-      pageNumber = 0; // Reset pageNumber for actual doc
-
-
-      initialYPosForContent = addPageHeaderAndLogoToPdf();
-
-      while (yOffsetOnMainCanvas < mainCanvas.height) {
-        if (pageNumber > 1) { // For pages after the first
-          doc.addPage();
-          initialYPosForContent = addPageHeaderAndLogoToPdf();
-        }
-
-        const contentHeightOnPdfPage = pdfPageHeight - initialYPosForContent - margin - 30; // 30 for footer space
-        const sourceSegmentHeightOnCanvas = Math.min(
-            mainCanvas.height - yOffsetOnMainCanvas, // Remaining height on main canvas
-            (contentHeightOnPdfPage / pdfFullImageWidth) * mainCanvas.width // Convert PDF height to canvas pixel height
-        );
-
-        if (sourceSegmentHeightOnCanvas <= 0) break; // No more content or space
-
-        // Create a temporary canvas for the current segment
-        const segmentCanvas = document.createElement('canvas');
-        segmentCanvas.width = mainCanvas.width; // Use full width of source
-        segmentCanvas.height = sourceSegmentHeightOnCanvas;
-        const segmentCtx = segmentCanvas.getContext('2d');
-        
-        if (segmentCtx) {
-            segmentCtx.drawImage(
-                mainCanvas,
-                0,                      // Source X from mainCanvas
-                yOffsetOnMainCanvas,    // Source Y from mainCanvas
-                mainCanvas.width,       // Source Width from mainCanvas
-                sourceSegmentHeightOnCanvas, // Source Height for this segment
-                0,                      // Destination X on segmentCanvas
-                0,                      // Destination Y on segmentCanvas
-                mainCanvas.width,       // Destination Width on segmentCanvas
-                sourceSegmentHeightOnCanvas // Destination Height on segmentCanvas
-            );
-
-            const segmentImgData = segmentCanvas.toDataURL('image/png');
-            const segmentPdfHeight = (segmentCanvas.height / segmentCanvas.width) * pdfFullImageWidth;
-
-            doc.addImage(
-              segmentImgData,
-              'PNG',
-              margin,
-              initialYPosForContent,
-              pdfFullImageWidth,
-              segmentPdfHeight // Height of this segment in PDF, maintaining aspect ratio
-            );
-        }
-        
-        yOffsetOnMainCanvas += sourceSegmentHeightOnCanvas;
-      }
-      
-      const finalNumPages = doc.getNumberOfPages();
-      for (let i = 1; i <= finalNumPages; i++) {
-        doc.setPage(i);
-        addPageFooterToPdf(i, finalNumPages);
+      const addLogoIfNeeded = () => {
+           if (logoDataUrl) {
+               logoWidth = 30; logoHeight = 30;
+               logoX = pageWidth - margin - logoWidth;
+               logoY = margin - 10;
+               doc.addImage(logoDataUrl!, 'PNG', logoX, logoY, logoWidth, logoHeight);
+           }
       }
 
-      const pageRangeString = (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) ? `_p${startPage}-${endPage}` : '';
-      const filename = `${subject.replace(/ /g, '_') || 'Notes'}_Grade${grade || 'N_A'}${pageRangeString}_Notes_Visual.pdf`;
-      doc.save(filename);
+      addLogoIfNeeded();
+      if (logoDataUrl) {
+          yPos = Math.max(yPos, (margin - 10) + logoHeight + 5);
+      }
 
-      dismissGeneratingToast(); // <-- Call dismiss on the returned object
-      toast({
-        title: "Visual PDF Generated!",
-        description: `${filename} downloading. Note: Text in this PDF is not selectable.`,
-        duration: 7000
+
+      const addStyledText = (text: string, x: number, y: number, options?: any): number => {
+          const fontSize = options?.fontSize || 10;
+          const fontStyle = options?.fontStyle || 'normal';
+          const lineHeight = fontSize * 1.2;
+          doc.setFontSize(fontSize);
+          doc.setFont('helvetica', fontStyle);
+          const splitText = doc.splitTextToSize(text, maxLineWidth);
+          let newY = y;
+          splitText.forEach((line: string) => {
+               if (newY + lineHeight > Math.min(footerStartY, pageHeight - margin)) {
+                  doc.addPage();
+                  newY = margin;
+                  addLogoIfNeeded();
+                  doc.setFontSize(fontSize);
+                  doc.setFont('helvetica', fontStyle);
+                  newY = Math.max(newY, (margin - 10) + logoHeight + 5);
+               }
+               doc.text(line, x, newY, options);
+               newY += lineHeight;
+          });
+           return newY + (fontSize * 0.25);
+      };
+
+      doc.setFont("helvetica", "bold");
+      yPos = addStyledText(`Study Notes: ${subject || 'Unknown'} - Grade ${grade || 'N/A'}`, margin, yPos, { fontSize: 14 });
+      doc.setLineWidth(0.5); doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 15;
+
+      const lines = generatedNotes.split('\n');
+      const listIndent = margin + 15;
+      // let currentFontSize = 10; // Removed as not strictly necessary with addStyledText localizing font
+      // let currentFontStyle = 'normal'; // Removed as not strictly necessary
+
+      lines.forEach(line => {
+          const trimmedLine = line.trim();
+          // let consumed = false; // 'consumed' logic was more for direct doc.text, less for addStyledText
+          // currentFontStyle = 'normal'; // Reset in addStyledText if not passed
+          // currentFontSize = 10; // Reset in addStyledText if not passed
+
+          if (trimmedLine.startsWith('# ')) { yPos = addStyledText(trimmedLine.substring(2), margin, yPos + 5, { fontSize: 16, fontStyle: 'bold' }); }
+          else if (trimmedLine.startsWith('## ')) { yPos = addStyledText(trimmedLine.substring(3), margin, yPos + 4, { fontSize: 14, fontStyle: 'bold' }); }
+          else if (trimmedLine.startsWith('### ')) { yPos = addStyledText(trimmedLine.substring(4), margin, yPos + 3, { fontSize: 12, fontStyle: 'bold' }); }
+          else if (trimmedLine.startsWith('* ') || trimmedLine.startsWith('- ') || trimmedLine.startsWith('+ ')) { const itemText = trimmedLine.substring(2).replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1'); yPos = addStyledText(`• ${itemText}`, listIndent, yPos); }
+          else if (/^\d+\.\s/.test(trimmedLine)) { const itemText = trimmedLine.substring(trimmedLine.indexOf('.') + 1).trim().replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1'); const numPrefix = trimmedLine.substring(0, trimmedLine.indexOf('.') + 1); yPos = addStyledText(`${numPrefix} ${itemText}`, listIndent, yPos); }
+          else if (trimmedLine === '---' || trimmedLine === '***' || trimmedLine === '___') { if (yPos + 15 > Math.min(footerStartY, pageHeight - margin)) { doc.addPage(); yPos = margin; addLogoIfNeeded(); } doc.setLineWidth(0.5); doc.line(margin, yPos + 5, pageWidth - margin, yPos + 5); yPos += 15; }
+          else if (trimmedLine.startsWith('> ')) { yPos = addStyledText(trimmedLine.substring(2), margin + 10, yPos, { fontStyle: 'italic' }); }
+          else if (trimmedLine) { const cleanedLine = trimmedLine.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').replace(/`(.*?)`/g, '"$1"'); yPos = addStyledText(cleanedLine, margin, yPos); }
       });
 
-    } catch (error) {
-      console.error("Error generating visual Notes PDF:", error);
-      dismissGeneratingToast(); // <-- Also dismiss on error
-      toast({ title: "PDF Error", description: "Could not generate visual PDF. Check console for details.", variant: "destructive" });
-    }
-  };
-  
-  const handleDownloadQuestionsPdf = async () => {
-    const questionsToDownload = generatedQuestions[activeQuestionTab]; const currentQuestionTypeTitle = questionTypeTitles[activeQuestionTab];
-    if (!questionsToDownload || questionsToDownload.length === 0) { toast({ title: "Cannot Download", description: `No ${currentQuestionTypeTitle} questions generated.`, variant: "destructive"}); return; }
-    try {
-        let logoDataUrl: string | null = null;
-        try { logoDataUrl = await loadImageData('/logo.png'); }
-        catch (imgError: any) { console.warn("Could not load logo for PDF:", imgError.message); }
+      yPos += 10; doc.setLineWidth(0.2);
+      if (yPos > footerStartY - 20) { doc.addPage(); yPos = margin; addLogoIfNeeded(); }
+      doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 15;
+      doc.setFontSize(8); doc.setFont('helvetica', 'italic');
+      if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) { const pageRangeText = `Source Pages (Printed): ${startPage} - ${endPage}`; yPos = addStyledText(pageRangeText, margin, yPos, { fontSize: 8, fontStyle: 'italic' }); yPos += 5; }
+      const telegramText = "Join Telegram: https://t.me/grade9to12ethiopia";
+      if (yPos + 10 > pageHeight - margin) { doc.addPage(); yPos = margin; addLogoIfNeeded();}
+      doc.setTextColor(60, 60, 60); doc.text(telegramText, margin, yPos); doc.setTextColor(0, 0, 0);
 
-        const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
-        const pageHeight = doc.internal.pageSize.height; const pageWidth = doc.internal.pageSize.width; const margin = 40; const maxLineWidth = pageWidth - margin * 2; let yPos = margin; const footerStartY = pageHeight - margin - 40; // Adjusted for more footer space
-        // let logoX = 0, logoY = 0, logoWidth = 0, logoHeight = 0; // Already scoped in addLogoIfNeeded if defined outside
+      const pageRangeString = (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) ? `_p${startPage}-${endPage}` : '';
+      const filename = `${subject.replace(/ /g, '_') || 'Notes'}_Grade${grade || 'N_A'}${pageRangeString}_Notes.pdf`;
+      doc.save(filename);
+      toast({ title: "Download Started", description: `Downloading ${filename}`});
 
-        const addLogoAndQuestionHeader = (currentPageY: number): number => {
-             let currentY = currentPageY;
-             if (logoDataUrl) {
-                 const logoWidth = 30; const logoHeight = 30;
-                 const logoX = pageWidth - margin - logoWidth;
-                 doc.addImage(logoDataUrl!, 'PNG', logoX, margin - 15, logoWidth, logoHeight);
-                 currentY = Math.max(currentY, margin -15 + logoHeight + 10);
-             }
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(14);
-            const titleText = `Practice Questions: ${subject || 'Unknown'} - Grade ${grade || 'N/A'}`;
-            const maxTitleWidth = logoDataUrl ? pageWidth - margin * 2 - 40 : pageWidth - margin * 2;
-            const titleLines = doc.splitTextToSize(titleText, maxTitleWidth);
-            doc.text(titleLines, margin, currentY);
-            currentY += titleLines.length * 14 * 0.8; 
-            
-            doc.setFontSize(12); doc.setFont("helvetica", "italic");
-            const typeText = `Type: ${currentQuestionTypeTitle}`;
-            const typeLines = doc.splitTextToSize(typeText, maxTitleWidth);
-            doc.text(typeLines, margin, currentY);
-            currentY += typeLines.length * 12 * 0.8 + 10; // Adjusted line height
-            
-            doc.setLineWidth(0.5); doc.line(margin, currentY, pageWidth - margin, currentY); currentY += 15;
-            return currentY;
-        };
-
-        const addQuestionFooter = (currentPage: number, totalPages: number) => {
-            let footerY = pageHeight - margin;
-            doc.setLineWidth(0.2);
-            doc.line(margin, footerY - 25, pageWidth - margin, footerY - 25);
-            doc.setFontSize(8); doc.setFont('helvetica', 'italic');
-            
-            let footerLineOffset = -15;
-            if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) {
-              doc.text(`Source Pages: ${startPage} - ${endPage}`, margin, footerY + footerLineOffset);
-              footerLineOffset += 10;
-            }
-            doc.setTextColor(60, 60, 60);
-            doc.text("Join Telegram: https://t.me/grade9to12ethiopia", margin, footerY + footerLineOffset);
-            doc.setTextColor(0, 0, 0);
-            doc.text(`Page ${currentPage} of ${totalPages}`, pageWidth - margin - doc.getTextWidth(`Page ${currentPage} of ${totalPages}`), footerY + footerLineOffset);
-        };
-
-
-        const addTextToQuestionsPdf = (text: string | undefined | null, x: number, currentY: number, options?: any): { newY: number, textWasSplit: boolean } => {
-            if (!text || !text.trim()) return { newY: currentY, textWasSplit: false };
-            const fontSize = options?.fontSize || 10;
-            const fontStyle = options?.fontStyle || 'normal';
-            const qLineHeight = fontSize * 1.2;
-            const textMaxWidth = options?.maxWidth || maxLineWidth;
-            
-            doc.setFontSize(fontSize);
-            doc.setFont('helvetica', fontStyle);
-            const splitLines = doc.splitTextToSize(text, textMaxWidth);
-            let tempY = currentY;
-            let textSplitAcrossPages = false;
-
-            splitLines.forEach((line: string, lineIndex: number) => {
-                if (tempY + qLineHeight > footerStartY ) {
-                    if (lineIndex > 0) textSplitAcrossPages = true; // Indicate that a part of this text block started on previous page
-                    addQuestionFooter(doc.getNumberOfPages(), 0); // Placeholder for total pages for now
-                    doc.addPage();
-                    tempY = addLogoAndQuestionHeader(margin); // Add header to new page
-                    doc.setFontSize(fontSize); // Re-apply font for this line
-                    doc.setFont('helvetica', fontStyle);
-                }
-                doc.text(line, x, tempY);
-                tempY += qLineHeight;
-            });
-            return { newY: tempY + (fontSize * 0.15), textWasSplit: textSplitAcrossPages }; // Small gap after block
-        };
-
-        yPos = addLogoAndQuestionHeader(margin); // Initial header on first page
-
-        questionsToDownload.forEach((q, index) => {
-            let questionBlockStartY = yPos;
-
-            const qResult = addTextToQuestionsPdf(`${index + 1}. ${q.question || 'Missing Question Text'}`, margin, yPos, { fontStyle: 'bold' });
-            yPos = qResult.newY;
-
-            if (activeQuestionTab === 'multiple-choice' && q.options && q.options.length === 4) {
-                q.options.forEach((opt, optIndex) => {
-                    const letter = getCorrectAnswerLetter(optIndex);
-                    const cleanedOpt = typeof opt === 'string' ? opt.replace(/✓/g, '').trim() : opt;
-                    yPos = addTextToQuestionsPdf(`${letter}) ${cleanedOpt || 'Missing Option'}`, margin + 15, yPos, { maxWidth: maxLineWidth - 15 }).newY;
-                });
-            }
-            yPos += 2; // Small space before answer
-            
-            let answerText = 'Answer: Not provided';
-            if (activeQuestionTab !== 'multiple-choice' && q.answer) { answerText = `Answer: ${q.answer}`; }
-            else if (activeQuestionTab === 'multiple-choice') { /* ... MCQ answer logic ... */ 
-                let pdfCorrectLetter = null; if (typeof q.answer === 'string' && /^[A-D]$/i.test(q.answer) && typeof q.correctAnswerIndex === 'number') { pdfCorrectLetter = q.answer.toUpperCase(); } else if (q.options) { const derivedIndex = q.options.findIndex(opt => typeof opt === 'string' && opt.includes('✓')); if (derivedIndex !== -1) { pdfCorrectLetter = getCorrectAnswerLetter(derivedIndex); } } if (pdfCorrectLetter) { answerText = `Correct Answer: ${pdfCorrectLetter}`; } else { answerText = `Correct Answer: Could not determine`; }
-            }
-            yPos = addTextToQuestionsPdf(answerText, margin + 15, yPos, { fontStyle: 'italic', maxWidth: maxLineWidth - 15 }).newY;
-            
-            if (q.explanation) {
-                yPos = addTextToQuestionsPdf(`Explanation: ${q.explanation}`, margin + 15, yPos, { fontStyle: 'italic', maxWidth: maxLineWidth - 15 }).newY;
-            }
-            
-            yPos += 8; // Space after each question block
-            if (index < questionsToDownload.length - 1) {
-                if (yPos + 20 > footerStartY) { // Check if next separator + question will overflow
-                    addQuestionFooter(doc.getNumberOfPages(), 0);
-                    doc.addPage();
-                    yPos = addLogoAndQuestionHeader(margin);
-                } else {
-                    doc.setLineWidth(0.2);
-                    doc.line(margin, yPos, pageWidth - margin, yPos);
-                    yPos += 10;
-                }
-            }
-        });
-        
-        // Finalize footers with correct total page count
-        const totalQPages = doc.getNumberOfPages();
-        for (let i = 1; i <= totalQPages; i++) {
-            doc.setPage(i);
-            addQuestionFooter(i, totalQPages);
-        }
-
-        const pageRangeString = (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) ? `_p${startPage}-${endPage}` : '';
-        const filename = `${subject.replace(/ /g, '_') || 'Questions'}_Grade${grade || 'N_A'}${pageRangeString}_${activeQuestionTab}_Questions.pdf`;
-        doc.save(filename);
-        toast({ title: "Download Started", description: `Downloading ${filename}`});
-    } catch(error) { console.error("Error generating Questions PDF:", error); toast({ title: "PDF Error", description: "Could not generate Questions PDF. Check console.", variant: "destructive"}); }
+    } catch (error) { console.error("Error generating Notes PDF:", error); toast({ title: "PDF Error", description: "Could not generate PDF.", variant: "destructive"}); }
  };
 
+ const handleDownloadQuestionsPdf = async () => {
+      const questionsToDownload = generatedQuestions[activeQuestionTab]; const currentQuestionTypeTitle = questionTypeTitles[activeQuestionTab];
+      if (!questionsToDownload || questionsToDownload.length === 0) { toast({ title: "Cannot Download", description: `No ${currentQuestionTypeTitle} questions generated.`, variant: "destructive"}); return; }
+      try {
+          let logoDataUrl: string | null = null;
+          try { logoDataUrl = await loadImageData('/logo.png'); }
+          catch (imgError: any) { console.warn("Could not load logo for PDF:", imgError.message); }
+
+          const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+          const pageHeight = doc.internal.pageSize.height; const pageWidth = doc.internal.pageSize.width; const margin = 40; const maxLineWidth = pageWidth - margin * 2; let yPos = margin; const footerStartY = pageHeight - margin - 30;
+          let logoX = 0, logoY = 0, logoWidth = 0, logoHeight = 0;
+
+          const addLogoIfNeeded = () => {
+               if (logoDataUrl) { logoWidth = 30; logoHeight = 30; logoX = pageWidth - margin - logoWidth; logoY = margin - 10; doc.addImage(logoDataUrl!, 'PNG', logoX, logoY, logoWidth, logoHeight); }
+          }
+
+          addLogoIfNeeded();
+           if (logoDataUrl) { yPos = Math.max(yPos, (margin - 10) + logoHeight + 5); }
+
+          const addText = (text: string | undefined | null, x: number, y: number, options?: any): number => { if (!text || !text.trim()) return y; const questionLineHeight = (options?.fontSize || 10) * 1.2; doc.setFontSize(options?.fontSize || 10); doc.setFont('helvetica', options?.fontStyle || 'normal'); const split = doc.splitTextToSize(text, (options?.maxWidth || maxLineWidth)); let newY = y; split.forEach((line: string) => { if (newY + questionLineHeight > Math.min(footerStartY, pageHeight - margin) ) { doc.addPage(); newY = margin; addLogoIfNeeded(); doc.setFontSize(options?.fontSize || 10); doc.setFont('helvetica', options?.fontStyle || 'normal'); newY = Math.max(newY, (margin - 10) + logoHeight + 5); } doc.text(line, x, newY, options); newY += questionLineHeight; }); return newY + ((options?.fontSize || 10) * 0.25); };
+
+          doc.setFont("helvetica", "bold"); yPos = addText(`Practice Questions: ${subject || 'Unknown'} - Grade ${grade || 'N/A'}`, margin, yPos, { fontSize: 14 }); doc.setFontSize(12); doc.setFont("helvetica", "italic"); yPos = addText(`Type: ${currentQuestionTypeTitle}`, margin, yPos); doc.setLineWidth(0.5); doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 15;
+
+          questionsToDownload.forEach((q, index) => {
+              if (yPos > pageHeight - (margin + 60)) { doc.addPage(); yPos = margin; addLogoIfNeeded(); }
+              doc.setFont("helvetica", "bold"); yPos = addText(`${index + 1}. ${q.question || 'Missing Question Text'}`, margin, yPos, {maxWidth: maxLineWidth}); doc.setFont("helvetica", "normal"); yPos += 5;
+              if (activeQuestionTab === 'multiple-choice' && q.options && q.options.length === 4) { q.options.forEach((opt, optIndex) => { const letter = getCorrectAnswerLetter(optIndex); const cleanedOpt = typeof opt === 'string' ? opt.replace(/✓/g, '').trim() : opt; yPos = addText(`${letter}) ${cleanedOpt || 'Missing Option'}`, margin + 15, yPos, {maxWidth: maxLineWidth - 15}); }); yPos += 5; }
+               doc.setFont("helvetica", "italic"); yPos += 2; let answerText = 'Answer: Not provided'; if (activeQuestionTab !== 'multiple-choice' && q.answer) { answerText = `Answer: ${q.answer}`; } else if (activeQuestionTab === 'multiple-choice') { let pdfCorrectLetter = null; if (typeof q.answer === 'string' && /^[A-D]$/i.test(q.answer) && typeof q.correctAnswerIndex === 'number') { pdfCorrectLetter = q.answer.toUpperCase(); } else if (q.options) { const derivedIndex = q.options.findIndex(opt => typeof opt === 'string' && opt.includes('✓')); if (derivedIndex !== -1) { pdfCorrectLetter = getCorrectAnswerLetter(derivedIndex); } } if (pdfCorrectLetter) { answerText = `Correct Answer: ${pdfCorrectLetter}`; } else { answerText = `Correct Answer: Could not determine`; } } yPos = addText(answerText, margin + 15, yPos, {maxWidth: maxLineWidth - 15}); doc.setFont("helvetica", "normal"); yPos += 5;
+               if (q.explanation) { doc.setFont("helvetica", "italic"); yPos = addText(`Explanation: ${q.explanation}`, margin + 15, yPos, {maxWidth: maxLineWidth - 15}); doc.setFont("helvetica", "normal"); yPos += 5; }
+              yPos += 8; if (index < questionsToDownload.length - 1) { if (yPos > Math.min(footerStartY, pageHeight - margin)) { doc.addPage(); yPos = margin; addLogoIfNeeded();} doc.setLineWidth(0.2); doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 10; } else { yPos += 5; }
+          });
+
+          yPos += 10; doc.setLineWidth(0.2);
+          if (yPos > footerStartY - 20) { doc.addPage(); yPos = margin; addLogoIfNeeded(); }
+          doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 15;
+          doc.setFontSize(8); doc.setFont('helvetica', 'italic');
+          if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) { const pageRangeText = `Source Pages (Printed): ${startPage} - ${endPage}`; yPos = addText(pageRangeText, margin, yPos, { fontSize: 8, fontStyle: 'italic'}); yPos += 5; }
+          const telegramText = "Join Telegram: https://t.me/grade9to12ethiopia";
+          if (yPos + 10 > pageHeight - margin) { doc.addPage(); yPos = margin; addLogoIfNeeded();}
+          doc.setTextColor(60, 60, 60); doc.text(telegramText, margin, yPos); doc.setTextColor(0, 0, 0);
+
+          const pageRangeString = (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage > 0) ? `_p${startPage}-${endPage}` : '';
+          const filename = `${subject.replace(/ /g, '_') || 'Questions'}_Grade${grade || 'N_A'}${pageRangeString}_${activeQuestionTab}_Questions.pdf`;
+          doc.save(filename);
+          toast({ title: "Download Started", description: `Downloading ${filename}`});
+      } catch(error) { console.error("Error generating Questions PDF:", error); toast({ title: "PDF Error", description: "Could not generate PDF.", variant: "destructive"}); }
+ };
 
   // === Main Component Render ===
   return (
@@ -490,86 +280,93 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       <Separator className="my-8 md:my-10" />
 
-      {/* Content Area Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-        {/* Notes Card */}
-        <Card className="shadow-md dark:shadow-slate-800/50 border border-border/50 flex flex-col min-h-[500px] md:min-h-[600px] lg:min-h-[700px]">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 md:p-6">
-            <CardTitle className="text-base md:text-lg flex items-center gap-2">
-              <FileText className="h-4 w-4 md:h-5 md:w-5 text-primary/80" /> Generated Notes
-            </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownloadNotesPdf}
-              disabled={!generatedNotes.trim() || isGeneratingNotes}
-              title="Download Notes as PDF (Visual - Not Text Selectable)"
-            >
-              <Download className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-1.5" />
-              <span className="hidden sm:inline">Download </span>PDF
-            </Button>
-          </CardHeader>
+         {/* Content Area Grid */}
+         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+            {/* Notes Card */}
+            <Card className="shadow-md dark:shadow-slate-800/50 border border-border/50 flex flex-col min-h-[500px] md:min-h-[600px] lg:min-h-[700px]">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 md:p-6">
+                <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                  <FileText className="h-4 w-4 md:h-5 md:w-5 text-primary/80" /> Generated Notes
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadNotesPdf}
+                  disabled={!generatedNotes.trim() || isGeneratingNotes}
+                  title="Download Notes as PDF"
+                >
+                  <Download className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-1.5" />
+                  <span className="hidden sm:inline">Download </span>PDF
+                </Button>
+              </CardHeader>
 
-          <CardContent className="flex-grow flex flex-col p-0">
-            {isGeneratingNotes && !generatedNotes ? (
-              <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
-                <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin mb-4 text-primary" />
-                <p className="text-xs md:text-sm font-medium">{noteGenerationMessage || "Generating notes..."}</p>
-              </div>
-            ) : !generatedNotes.trim() ? (
-              <div className="flex flex-col items-center justify-center flex-grow text-muted-foreground p-6 text-center">
-                <FileText size={48} className="mb-4 opacity-50" />
-                <p className="text-sm font-medium">No Notes Generated</p>
-                <p className="text-xs mt-1">Click "Generate Notes" above or check input.</p>
-              </div>
-            ) : (
-              <ScrollArea className="flex-grow w-full rounded-b-lg border-t dark:border-slate-700">
-                <div className="p-5 md:p-8">
-                  <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        table: ({ node, ...props }) => (
-                          <div className="my-4 overflow-x-auto rounded-md border dark:border-slate-600">
-                            <table {...props} className="w-full" /> {/* w-full for better prose compatibility */}
-                          </div>
-                        ),
-                      }}
-                    >
-                      {generatedNotes}
-                    </ReactMarkdown>
+              <CardContent className="flex-grow flex flex-col p-0">
+                {isGeneratingNotes && !generatedNotes ? (
+                  <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
+                    <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin mb-4 text-primary" />
+                    <p className="text-xs md:text-sm font-medium">{noteGenerationMessage || "Generating notes..."}</p>
                   </div>
-                </div>
-                <ScrollBar orientation="horizontal" />
-              </ScrollArea>
-            )}
-          </CardContent>
-        </Card>
+                ) : !generatedNotes.trim() ? (
+                  <div className="flex flex-col items-center justify-center flex-grow text-muted-foreground p-6 text-center">
+                    <FileText size={48} className="mb-4 opacity-50" />
+                    <p className="text-sm font-medium">No Notes Generated</p>
+                    <p className="text-xs mt-1">Click "Generate Notes" above or check input.</p>
+                  </div>
+                ) : (
+                  <ScrollArea className="flex-grow w-full rounded-b-lg border-t dark:border-slate-700">
+                    <div className="p-5 md:p-8">
+                      <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            table: ({ node, ...props }) => (
+                              // This div provides the horizontal scroll for an individual table if it's too wide.
+                              <div className="my-4 overflow-x-auto rounded-md border dark:border-slate-600">
+                                {/*
+                                  The table itself. 'prose' styles will generally apply width: 100%
+                                  (relative to this scrollable div).
+                                  If table content (cells) are intrinsically wider and cannot wrap
+                                  enough to fit this 100% width, the div's scrollbar will activate.
+                                */}
+                                <table {...props} />
+                              </div>
+                            ),
+                          }}
+                        >
+                          {generatedNotes}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                    <ScrollBar orientation="horizontal" />
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
 
-        {/* Questions Card (structure remains same, logic updated for pagination) */}
-        <Card className="shadow-md dark:shadow-slate-800/50 border border-border/50 flex flex-col min-h-[500px] md:min-h-[600px] lg:min-h-[700px]">
-             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 md:p-6">
-                 <CardTitle className="text-base md:text-lg flex items-center gap-2"> <HelpCircle className="h-4 w-4 md:h-5 md:w-5 text-primary/80" /> Practice Questions </CardTitle>
-                 <Button variant="outline" size="sm" onClick={handleDownloadQuestionsPdf} disabled={(!generatedQuestions[activeQuestionTab] || generatedQuestions[activeQuestionTab].length === 0) || Object.values(isGeneratingQuestions).some(loading => loading)} title={`Download ${questionTypeTitles[activeQuestionTab]} Questions as PDF`} > <Download className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-1.5" /> <span className="hidden sm:inline">Download </span>PDF </Button>
-             </CardHeader>
-             <CardContent className="flex-grow flex flex-col pt-2 px-4 pb-4 md:px-6 md:pb-6">
-                 <Tabs defaultValue="multiple-choice" value={activeQuestionTab} onValueChange={(value) => setActiveQuestionTab(value as CurrentQuestionTypeValue)} className="w-full flex flex-col flex-grow" >
-                     <ScrollArea className="w-full whitespace-nowrap rounded-md mb-5 md:mb-6">
-                         <TabsList className="inline-grid w-max grid-cols-4">
-                             {availableQuestionTypes.map((type) => ( <TabsTrigger key={type} value={type} disabled={!!componentError || isGeneratingNotes || isGeneratingQuestions[type]} className="text-xs px-2 sm:px-3" > {questionTypeTitles[type].replace('Multiple Choice', 'MCQ').replace('Fill-in-the-Blank','FIB').replace('Short Answer', 'Short').replace('True/False','T/F')} </TabsTrigger> ))}
-                         </TabsList>
-                         <ScrollBar orientation="horizontal" />
-                     </ScrollArea>
-                     <div className="flex-grow relative min-h-[400px] md:min-h-[450px] border rounded-md bg-muted/20 dark:bg-muted/30 overflow-hidden">
-                         {availableQuestionTypes.map((type) => { const isLoading = isGeneratingQuestions[type]; const message = questionGenerationMessage[type]; const questions = generatedQuestions[type] ?? []; return ( <TabsContent key={type} value={type} className="absolute inset-0 focus-visible:ring-0 focus-visible:ring-offset-0 m-0" tabIndex={-1}> {isLoading && questions.length === 0 ? ( <div className="flex h-full flex-col items-center justify-center text-muted-foreground p-6 text-center"> <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin mb-4 text-primary" /> <p className="text-xs md:text-sm font-medium">{message || `Generating ${questionTypeTitles[type]}...`}</p> </div> ) : questions.length > 0 ? ( <ScrollArea className="h-full w-full"> <ul className="space-y-5 md:space-y-6 p-5 md:p-8">{questions.map((question, index) => ( <li key={`${type}-${index}`} className="border rounded-lg p-4 md:p-5 shadow-sm bg-background dark:border-slate-700"> <p className="font-medium mb-2 md:mb-3 text-sm md:text-base flex items-start"> <span className="text-primary/90 mr-2 font-semibold">{index + 1}.</span> <span className="flex-1" dangerouslySetInnerHTML={{ __html: renderInlineFormatting(question.question) }}/> </p> {renderQuestionContent(type, question, index)} </li> ))}</ul> </ScrollArea> ) : ( <div className="flex h-full flex-col items-center justify-center text-muted-foreground p-6 text-center"> <ListChecks className="h-10 w-10 md:h-12 md:w-12 mb-4 opacity-50"/> <p className="text-xs md:text-sm font-medium">No Questions Yet</p> <p className="text-xs mt-1">Generate some '{questionTypeTitles[type]}' questions!</p> </div> )} </TabsContent> ); })}
-                     </div>
-                 </Tabs>
-            </CardContent>
-         </Card>
-      </div>
-    </>
-  );
+
+             {/* Questions Card */}
+             <Card className="shadow-md dark:shadow-slate-800/50 border border-border/50 flex flex-col min-h-[500px] md:min-h-[600px] lg:min-h-[700px]">
+                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 md:p-6">
+                     <CardTitle className="text-base md:text-lg flex items-center gap-2"> <HelpCircle className="h-4 w-4 md:h-5 md:w-5 text-primary/80" /> Practice Questions </CardTitle>
+                     <Button variant="outline" size="sm" onClick={handleDownloadQuestionsPdf} disabled={(!generatedQuestions[activeQuestionTab] || generatedQuestions[activeQuestionTab].length === 0) || Object.values(isGeneratingQuestions).some(loading => loading)} title={`Download ${questionTypeTitles[activeQuestionTab]} Questions as PDF`} > <Download className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-1.5" /> <span className="hidden sm:inline">Download </span>PDF </Button>
+                 </CardHeader>
+                 <CardContent className="flex-grow flex flex-col pt-2 px-4 pb-4 md:px-6 md:pb-6">
+                     <Tabs defaultValue="multiple-choice" value={activeQuestionTab} onValueChange={(value) => setActiveQuestionTab(value as CurrentQuestionTypeValue)} className="w-full flex flex-col flex-grow" >
+                         <ScrollArea className="w-full whitespace-nowrap rounded-md mb-5 md:mb-6">
+                             <TabsList className="inline-grid w-max grid-cols-4">
+                                 {availableQuestionTypes.map((type) => ( <TabsTrigger key={type} value={type} disabled={!!componentError || isGeneratingNotes || isGeneratingQuestions[type]} className="text-xs px-2 sm:px-3" > {questionTypeTitles[type].replace('Multiple Choice', 'MCQ').replace('Fill-in-the-Blank','FIB').replace('Short Answer', 'Short').replace('True/False','T/F')} </TabsTrigger> ))}
+                             </TabsList>
+                             <ScrollBar orientation="horizontal" />
+                         </ScrollArea>
+                         <div className="flex-grow relative min-h-[400px] md:min-h-[450px] border rounded-md bg-muted/20 dark:bg-muted/30 overflow-hidden">
+                             {availableQuestionTypes.map((type) => { const isLoading = isGeneratingQuestions[type]; const message = questionGenerationMessage[type]; const questions = generatedQuestions[type] ?? []; return ( <TabsContent key={type} value={type} className="absolute inset-0 focus-visible:ring-0 focus-visible:ring-offset-0 m-0" tabIndex={-1}> {isLoading && questions.length === 0 ? ( <div className="flex h-full flex-col items-center justify-center text-muted-foreground p-6 text-center"> <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin mb-4 text-primary" /> <p className="text-xs md:text-sm font-medium">{message || `Generating ${questionTypeTitles[type]}...`}</p> </div> ) : questions.length > 0 ? ( <ScrollArea className="h-full w-full"> <ul className="space-y-5 md:space-y-6 p-5 md:p-8">{questions.map((question, index) => ( <li key={`${type}-${index}`} className="border rounded-lg p-4 md:p-5 shadow-sm bg-background dark:border-slate-700"> <p className="font-medium mb-2 md:mb-3 text-sm md:text-base flex items-start"> <span className="text-primary/90 mr-2 font-semibold">{index + 1}.</span> <span className="flex-1" dangerouslySetInnerHTML={{ __html: renderInlineFormatting(question.question) }}/> </p> {renderQuestionContent(type, question, index)} </li> ))}</ul> </ScrollArea> ) : ( <div className="flex h-full flex-col items-center justify-center text-muted-foreground p-6 text-center"> <ListChecks className="h-10 w-10 md:h-12 md:w-12 mb-4 opacity-50"/> <p className="text-xs md:text-sm font-medium">No Questions Yet</p> <p className="text-xs mt-1">Generate some '{questionTypeTitles[type]}' questions!</p> </div> )} </TabsContent> ); })}
+                         </div>
+                     </Tabs>
+                </CardContent>
+             </Card>
+         </div>
+        </>
+    );
 };
 
 export default Dashboard;
-

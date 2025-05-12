@@ -2,27 +2,17 @@
 "use client";
 
 import { useState, useEffect, Dispatch, SetStateAction } from "react";
-import DashboardContainer from "@/components/Dashboard"; 
-import TextbookSelector from "@/components/TextbookSelector";
-import AuthForm from "@/components/AuthForm"; 
-import UserProfile from "@/components/UserProfile"; 
+import DashboardContainer from "@/components/DashboardContainer"; 
+import TextbookSelector from "@/components/TextbookSelector"; // Ensure this component is defined and props match
+import AuthForm from "@/components/AuthForm";             
+import UserProfile from "@/components/UserProfile";      // Ensure this component is defined and props match
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import Image from 'next/image';
-// Toaster should be in layout.tsx
-// import { Toaster } from "@/components/ui/toaster";
+import { UserData } from "@/types/dashboard"; // Import UserData from shared types
 
-type UserData = {
-  id?: string | number; // From your Vercel Postgres 'users' table schema
-  fullName?: string;
-  gradeLevel?: string;
-  phoneNumber?: string;
-  is_confirmed?: boolean; // From your Vercel Postgres 'users' table schema
-  registered_at?: string; // From your Vercel Postgres 'users' table schema
-} | null;
-
-const LOGIN_STATUS_KEY = 'app_login_status_v3'; // Increment version if data structure changes
+const LOGIN_STATUS_KEY = 'app_login_status_v3'; // Use consistent versioning
 const USER_DATA_KEY = 'app_user_data_v3';
 
 export default function Home() {
@@ -42,11 +32,12 @@ export default function Home() {
     if (loggedInStatus === 'true' && storedUserData) {
       try {
         const parsedData: UserData = JSON.parse(storedUserData);
-        if (parsedData && parsedData.phoneNumber) { 
+        // Add better validation for parsedData structure
+        if (parsedData && typeof parsedData.phoneNumber === 'string' && typeof parsedData.id !== 'undefined') { 
             setIsLoggedIn(true); setUserData(parsedData);
-        } else { throw new Error("Stored user data is invalid."); }
+        } else { throw new Error("Stored user data is incomplete or invalid."); }
       } catch (e) {
-        console.error("Auth Check: Failed to parse/validate localStorage data", e);
+        console.error("Auth Check: Failed to parse/validate localStorage data. Clearing auth state.", e);
         localStorage.removeItem(LOGIN_STATUS_KEY); localStorage.removeItem(USER_DATA_KEY);
         setIsLoggedIn(false); setUserData(null);
       }
@@ -55,20 +46,26 @@ export default function Home() {
   }, []);
 
   const handleLoginSuccess = (loggedInUser: UserData) => {
-      if (!loggedInUser || !loggedInUser.phoneNumber) { 
-          console.warn("handleLoginSuccess called with incomplete user data:", loggedInUser);
-          return; 
+      if (!loggedInUser || typeof loggedInUser.phoneNumber !== 'string' || typeof loggedInUser.id === 'undefined') { 
+        console.error("handleLoginSuccess called with incomplete or invalid user data:", loggedInUser);
+        // Optionally, inform the user that something went wrong during login data processing.
+        // toast({ title: "Login Process Error", description: "Could not process user data.", variant: "destructive"});
+        return; 
       }
-      console.log("Page: Login Succeeded for:", loggedInUser.phoneNumber, "Setting states and localStorage.");
       localStorage.setItem(LOGIN_STATUS_KEY, 'true');
       localStorage.setItem(USER_DATA_KEY, JSON.stringify(loggedInUser));
       setUserData(loggedInUser); 
-      setIsLoggedIn(true); // This is the crucial state update that should trigger re-render
+      setIsLoggedIn(true); 
+      console.log("Page: Login successful, user state updated:", loggedInUser.phoneNumber);
   };
 
   const handleLogout = () => {
     localStorage.removeItem(LOGIN_STATUS_KEY); localStorage.removeItem(USER_DATA_KEY);
     setIsLoggedIn(false); setUserData(null);
+    // Reset content selection on logout
+    setSelectedChapterContent(""); setSelectedSubject(""); setSelectedGrade("9");
+    setStartPageNum(undefined); setEndPageNum(undefined);
+    console.log("User logged out and content context reset.");
   };
 
   if (isLoadingAuth) {
@@ -76,8 +73,7 @@ export default function Home() {
   }
 
   if (!isLoggedIn) {
-    // *** CORRECTED PROP NAME ***
-    return ( <AuthForm onLoginSuccess={handleLoginSuccess} /> ); 
+    return ( <AuthForm onLoginSuccess={handleLoginSuccess} /> ); // Passing onLoginSuccess
   }
 
   return (
@@ -101,15 +97,15 @@ export default function Home() {
             </div>
             <div className="flex-grow min-h-0">
              <TextbookSelector
-                // These direct setters are fine if TextbookSelector is simple and doesn't need more control
+                // These need to be defined in TextbookSelectorProps in TextbookSelector.tsx
                 setSelectedChapterContent={setSelectedChapterContent}
                 setSelectedSubject={setSelectedSubject}
                 setSelectedGrade={setSelectedGrade}
                 setStartPageNum={setStartPageNum}
                 setEndPageNum={setEndPageNum}
-                // Optional: Pass current values if TextbookSelector needs to be a controlled component
-                // currentSubject={selectedSubject}
-                // currentGrade={selectedGrade}
+                // Optional: pass current values if TextbookSelector uses them
+                // currentSubject={selectedSubject} 
+                // currentGrade={selectedGrade}     
              />
             </div>
            {selectedChapterContent && (

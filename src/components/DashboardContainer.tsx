@@ -282,44 +282,177 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
     finally { setIsDeletingItem(null); } 
   };
 
-  // --- PDF Download Functions ---
-  const handleDownloadNotesPdf = async () => {
+// --- PDF Download Functions ---
+const handleDownloadNotesPdf = async () => {
     if (!generatedNotes.trim()) { toast({ title: "Cannot Download", description: "No notes generated.", variant: "destructive" }); return; }
     const { id: generatingToastId, dismiss: dismissGeneratingToast } = toast({ title: "Generating Visual PDF...", description: "Please wait...", duration: Infinity, });
     try {
       let logoDataUrl: string | null = null; try { logoDataUrl = await loadImageData('/logo.png'); } catch (e: any) { console.warn("Logo load error:", e.message); }
-      const captureContainer = document.createElement('div'); captureContainer.id = 'pdf-visual-capture-area'; Object.assign(captureContainer.style, { position: 'absolute', left: '-9999px', top: '-9999px', width: '800px', padding: '20px', background: 'white' });
-      if (document.documentElement.classList.contains('dark')) { captureContainer.classList.add('dark'); } document.body.appendChild(captureContainer);
+      
+      const captureContainer = document.createElement('div'); 
+      captureContainer.id = 'pdf-visual-capture-area'; 
+      Object.assign(captureContainer.style, { position: 'absolute', left: '-9999px', top: '-9999px', width: '800px', padding: '20px', background: 'white' });
+      if (document.documentElement.classList.contains('dark')) { captureContainer.classList.add('dark'); } 
+      document.body.appendChild(captureContainer);
+      
       const reactRoot = ReactDOM.createRoot(captureContainer);
       reactRoot.render( <React.StrictMode> <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none"> <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownPdfComponents}>{generatedNotes}</ReactMarkdown> </div> </React.StrictMode> );
       await new Promise(resolve => setTimeout(resolve, 1500));
-      const mainCanvas = await html2canvas(captureContainer, { scale: 2, useCORS: true, logging: false, removeContainer: false, onclone: (doc) => { const isDark = document.documentElement.classList.contains('dark'); doc.documentElement.classList.toggle('dark', isDark); doc.body.classList.toggle('dark', isDark);}});
+      
+      const mainCanvas = await html2canvas(captureContainer, { 
+          scale: 2, useCORS: true, logging: false, removeContainer: false, 
+          onclone: (clonedDoc) => { // Renamed to avoid conflict in outer scope if 'doc' is used
+              const isDark = document.documentElement.classList.contains('dark');
+              clonedDoc.documentElement.classList.toggle('dark', isDark); 
+              clonedDoc.body.classList.toggle('dark', isDark);
+          }
+      });
       reactRoot.unmount(); document.body.removeChild(captureContainer);
-      const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' }); const pdfW = doc.internal.pageSize.getWidth(); const pdfH = doc.internal.pageSize.getHeight(); const margin = 40; const footerH_pdf = 40; const contentW = pdfW - margin * 2; const imgOrigW = mainCanvas.width; const imgOrigH = mainCanvas.height; const pdfImgRenderW = contentW; const scale = pdfImgRenderW / imgOrigW; let yOffset = 0; let pageNum = 0;
-      const addHeader = (): number => { let hY = margin; if (logoDataUrl) { const logoS=30; doc.addImage(logoDataUrl,'PNG',pdfW-margin-logoS,margin-15,logoS,logoS); hY=Math.max(hY,margin-15+logoS+10); } doc.setFont('helvetica','bold').setFontSize(14); const title=`Study Notes: ${subject||'Notes'} - G${grade||'N/A'}`; const titleLines = doc.splitTextToSize(title,pdfW-margin*2-(logoDataUrl?45:0)); doc.text(titleLines,margin,hY); hY+=doc.getTextDimensions(titleLines.join('\n')).h+10; doc.setLineWidth(.5).line(margin,hY,pdfW-margin,hY); return hY+15; };
-      const addFooter = (pg: number, total: number) => { const fSY=pdfH-margin-footerH_pdf+10; doc.setLineWidth(.2).line(margin,fSY,pdfW-margin,fSY); let cFY=fSY+15; doc.setFontSize(8).setFont('helvetica','italic'); if(startPage !== undefined && endPage !== undefined && startPage > 0 && endPage > 0){ doc.text(`Source Pages: ${startPage} - ${endPage}`,margin,cFY); cFY+=10; } doc.setTextColor(60,60,60).text("Telegram: @grade9to12ethiopia",margin,cFY); doc.setTextColor(0,0,0); const pTxt=`Page ${pg} of ${total}`; doc.text(pTxt,pdfW-margin-doc.getTextWidth(pTxt),cFY);};
-      while (yOffset < imgOrigH) { pageNum++; if (pageNum > 1) doc.addPage(); doc.setPage(pageNum); const contentSY = addHeader(); const availH = pdfH - contentSY - margin - footerH_pdf; if (availH <= 0) { if (pageNum > 50) {console.error("PDF gen error (notes): available height too small."); break;} continue; } let segH = availH / scale; segH = Math.min(segH, imgOrigH - yOffset); if (segH <= 0) break; const segCan = document.createElement('canvas'); segCan.width = imgOrigW; segCan.height = segH; const segCtx = segCan.getContext('2d'); if (segCtx) { segCtx.drawImage(mainCanvas, 0, yOffset, imgOrigW, segH, 0, 0, imgOrigW, segH ); doc.addImage(segCan.toDataURL('image/png'), 'PNG', margin, contentSY, pdfImgRenderW, segH * scale ); } yOffset += segH; }
-      const totalPgs = doc.getNumberOfPages(); for (let i = 1; i <= totalPgs; i++) { doc.setPage(i); addFooter(i, totalPgs); }
-      const fNameSub = (subject||'Notes').replace(/ /g,'_'); const fNameGrade = grade||'N_A'; const fNamePages = (startPage !== undefined && endPage !== undefined) ? `_p${startPage}-${endPage}` : ''; const fName = `${fNameSub}_G${fNameGrade}${fNamePages}_Notes_Visual.pdf`; doc.save(fName);
+
+      const pdfDoc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' }); // Renamed to pdfDoc to avoid conflict
+      const pdfW = pdfDoc.internal.pageSize.getWidth(); 
+      const pdfH = pdfDoc.internal.pageSize.getHeight(); 
+      const margin = 40; 
+      const footerH_pdf = 50; // Increased footer height for link and page number
+      const contentW = pdfW - margin * 2; 
+      const imgOrigW = mainCanvas.width; 
+      const imgOrigH = mainCanvas.height; 
+      const pdfImgRenderW = contentW; 
+      const scale = pdfImgRenderW / imgOrigW; 
+      let yOffset = 0; 
+      let pageNum = 0;
+
+      const addHeader = (): number => { 
+          let hY = margin; 
+          if (logoDataUrl) { const logoS=30; pdfDoc.addImage(logoDataUrl,'PNG',pdfW-margin-logoS,margin-15,logoS,logoS); hY=Math.max(hY,margin-15+logoS+10); }
+          pdfDoc.setFont('helvetica','bold').setFontSize(14); 
+          
+          // --- MODIFIED TITLE ---
+          let titleString = `Study Notes: ${subject||'Notes'}`;
+          if (grade) titleString += ` - G${grade}`;
+          if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage >= startPage) {
+            titleString += ` (Pages ${startPage}-${endPage})`;
+          }
+          // --- END MODIFIED TITLE ---
+
+          const titleLines = pdfDoc.splitTextToSize(titleString,pdfW-margin*2-(logoDataUrl?45:0)); 
+          pdfDoc.text(titleLines,margin,hY); 
+          hY+=pdfDoc.getTextDimensions(titleLines.join('\n')).h+10; 
+          pdfDoc.setLineWidth(.5).line(margin,hY,pdfW-margin,hY); return hY+15; 
+      };
+      const addFooter = (pg: number, total: number) => { 
+          const fSY=pdfH-margin-footerH_pdf+10; 
+          pdfDoc.setLineWidth(.2).line(margin,fSY,pdfW-margin,fSY); 
+          let cFY=fSY+15; 
+          pdfDoc.setFontSize(8).setFont('helvetica','italic'); 
+          
+          const telegramText = "Telegram: @grade9to12ethiopia";
+          const telegramUrl = "https://t.me/grade9to12ethiopia";
+          pdfDoc.setTextColor(0, 0, 238); // Standard link blue
+          // --- MODIFIED FOR CLICKABLE LINK ---
+          pdfDoc.textWithLink(telegramText, margin, cFY, { url: telegramUrl });
+          pdfDoc.setTextColor(0,0,0); // Reset text color
+          
+          const pTxt=`Page ${pg} of ${total}`; 
+          pdfDoc.text(pTxt,pdfW-margin-pdfDoc.getTextWidth(pTxt),cFY);
+      };
+
+      while (yOffset < imgOrigH) { 
+          pageNum++; if (pageNum > 1) pdfDoc.addPage(); 
+          pdfDoc.setPage(pageNum); 
+          const contentSY = addHeader(); 
+          const availH = pdfH - contentSY - margin - footerH_pdf; 
+          if (availH <= 0) { if (pageNum > 50) {console.error("PDF gen error (notes): available height too small."); break;} continue; } 
+          let segH = availH / scale; 
+          segH = Math.min(segH, imgOrigH - yOffset); 
+          if (segH <= 0) break; 
+          const segCan = document.createElement('canvas'); segCan.width = imgOrigW; segCan.height = segH; 
+          const segCtx = segCan.getContext('2d'); 
+          if (segCtx) { 
+              segCtx.drawImage(mainCanvas, 0, yOffset, imgOrigW, segH, 0, 0, imgOrigW, segH ); 
+              pdfDoc.addImage(segCan.toDataURL('image/png'), 'PNG', margin, contentSY, pdfImgRenderW, segH * scale ); 
+          } 
+          yOffset += segH; 
+      }
+      const totalPgs = pdfDoc.getNumberOfPages();
+      for (let i = 1; i <= totalPgs; i++) { pdfDoc.setPage(i); addFooter(i, totalPgs); }
+      
+      let fName = `${(subject||'Notes').replace(/ /g,'_')}_G${grade||'N_A'}`;
+      // --- MODIFIED FILENAME ---
+      if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage >= startPage) {
+        fName += `_p${startPage}-${endPage}`;
+      }
+      fName += `_Notes_Visual.pdf`; 
+      pdfDoc.save(fName);
+      
       dismissGeneratingToast(); toast({ title: "Visual PDF Generated!", description: `${fName} downloading.`, duration: 7000 });
     } catch (error: any) { console.error("Visual PDF Error:", error); dismissGeneratingToast(); toast({ title: "PDF Error", description: error.message || "Could not generate visual PDF.", variant: "destructive" }); }
   };
 
   const handleDownloadQuestionsPdf = async () => {
-      const questionsToDownload = generatedQuestions[activeQuestionTab]; const currentQuestionTypeTitle = questionTypeTitles[activeQuestionTab]; 
+      const questionsToDownload = generatedQuestions[activeQuestionTab]; 
+      const currentQuestionTypeTitle = questionTypeTitles[activeQuestionTab]; 
       if (!questionsToDownload || questionsToDownload.length === 0) { toast({ title: "Cannot Download", description: `No ${currentQuestionTypeTitle} questions.`, variant: "destructive"}); return; }
       const { id: genQToastId, dismiss: dismissGenQToast } = toast({ title: `Generating ${currentQuestionTypeTitle} PDF...`, description:"Please wait.", duration: Infinity });
       try {
           let logoDataUrl: string | null = null; try { logoDataUrl = await loadImageData('/logo.png'); } catch (e:any) { console.warn("Logo PDF fail:", e.message); }
-          const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' }); 
-          const pageH = doc.internal.pageSize.height; const pageW = doc.internal.pageSize.width; const margin = 40; const lineMaxW = pageW - margin * 2; let yPos = margin; const footerReserve = 60;
+          
+          const pdfDoc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' }); // Renamed to pdfDoc
+          const pageH = pdfDoc.internal.pageSize.height; const pageW = pdfDoc.internal.pageSize.width; 
+          const margin = 40; const lineMaxW = pageW - margin * 2; let yPos = margin; 
+          const footerReserve = 60;
           let currentPageNum = 1;
-          const addPageWithHeader = (): number => { if (currentPageNum > 1) { doc.addPage(); } doc.setPage(currentPageNum); let currentY = margin; if (logoDataUrl) { const logoS=30; doc.addImage(logoDataUrl, 'PNG', pageW - margin - logoS, margin - 15, logoS, logoS); currentY = Math.max(currentY, margin - 15 + logoS + 10); } doc.setFont("helvetica", "bold").setFontSize(14); const title = `Practice Questions: ${subject || 'Unknown'} - Grade ${grade || 'N/A'}`; const titleLines = doc.splitTextToSize(title, lineMaxW - (logoDataUrl ? 45 : 0)); doc.text(titleLines, margin, currentY); currentY += doc.getTextDimensions(titleLines.join('\n')).h + 5; doc.setFont("helvetica", "italic").setFontSize(12); const typeTxt = `Type: ${currentQuestionTypeTitle}`; doc.text(typeTxt, margin, currentY); currentY += doc.getTextDimensions(typeTxt).h + 10; doc.setLineWidth(0.5).line(margin, currentY, pageW - margin, currentY); return currentY + 15; };
-          const addFooterToPage = (pageNum: number, totalPages: number) => { doc.setPage(pageNum); const footSY = pageH - margin - footerReserve + 10; doc.setLineWidth(0.2).line(margin, footSY, pageW - margin, footSY); let currentFooterY = footSY + 15; doc.setFontSize(8).setFont('helvetica', 'italic'); if (startPage !== undefined && endPage !== undefined) { doc.text(`Source Pages: ${startPage} - ${endPage}`, margin, currentFooterY); currentFooterY += 10; } doc.setTextColor(60,60,60).text("Telegram: @grade9to12ethiopia", margin, currentFooterY); doc.setTextColor(0,0,0); const pageNumText = `Page ${pageNum} of ${totalPages}`; doc.text(pageNumText, pageW - margin - doc.getTextWidth(pageNumText), currentFooterY);};
-          const addTextWithPotentialPageBreak = (text: string | null | undefined, x: number, currentY: number, options?: any): number => {
-              if (!text || !text.trim()) return currentY; const fontSize = options?.fontSize || 10; const fontStyle = options?.fontStyle || 'normal'; const textMaxWidth = options?.maxWidth || lineMaxW; doc.setFontSize(fontSize).setFont('helvetica', fontStyle); const lines = doc.splitTextToSize(text, textMaxWidth); const lineHeight = doc.getLineHeightFactor() * fontSize * (options?.lineHeightFactor || 1.0); let newY = currentY;
-              for (const line of lines) { if (newY + lineHeight > pageH - margin - footerReserve) { addFooterToPage(currentPageNum, 0); currentPageNum++; newY = addPageWithHeader(); doc.setFontSize(fontSize).setFont('helvetica', fontStyle); } doc.text(line, x, newY); newY += lineHeight; } return newY + (fontSize * 0.15);
+
+          const addPageWithHeader = (): number => { 
+              if (currentPageNum > 1) { pdfDoc.addPage(); } 
+              pdfDoc.setPage(currentPageNum); let currentY = margin; 
+              if (logoDataUrl) { const logoS=30; pdfDoc.addImage(logoDataUrl, 'PNG', pageW - margin - logoS, margin - 15, logoS, logoS); currentY = Math.max(currentY, margin - 15 + logoS + 10); } 
+              pdfDoc.setFont("helvetica", "bold").setFontSize(14); 
+              
+              // --- MODIFIED TITLE ---
+              let title = `Practice Questions: ${subject || 'Unknown'}`;
+              if (grade) title += ` - Grade ${grade}`;
+              if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage >= startPage) {
+                title += ` (Pages ${startPage}-${endPage})`;
+              }
+              // --- END MODIFIED TITLE ---
+
+              const titleLines = pdfDoc.splitTextToSize(title, lineMaxW - (logoDataUrl ? 45 : 0)); 
+              pdfDoc.text(titleLines, margin, currentY); 
+              currentY += pdfDoc.getTextDimensions(titleLines.join('\n')).h + 5; 
+              pdfDoc.setFont("helvetica", "italic").setFontSize(12); 
+              const typeTxt = `Type: ${currentQuestionTypeTitle}`; 
+              pdfDoc.text(typeTxt, margin, currentY); 
+              currentY += pdfDoc.getTextDimensions(typeTxt).h + 10; 
+              pdfDoc.setLineWidth(0.5).line(margin, currentY, pageW - margin, currentY); return currentY + 15; 
           };
+          const addFooterToPage = (pageNum: number, totalPages: number) => { 
+              pdfDoc.setPage(pageNum); 
+              const footSY = pageH - margin - footerReserve + 10; 
+              pdfDoc.setLineWidth(0.2).line(margin, footSY, pageW - margin, footSY); 
+              let currentFooterY = footSY + 15; 
+              pdfDoc.setFontSize(8).setFont('helvetica', 'italic'); 
+              
+              // Removed explicit "Source Pages" from here as it's now in the header title
+              // if (startPage !== undefined && endPage !== undefined) { 
+              //     pdfDoc.text(`Source Pages: ${startPage} - ${endPage}`, margin, currentFooterY); currentFooterY += 10; 
+              // } 
+              
+              const telegramText = "Telegram: @grade9to12ethiopia";
+              const telegramUrl = "https://t.me/grade9to12ethiopia";
+              pdfDoc.setTextColor(0, 0, 238); // Blue
+              // --- MODIFIED FOR CLICKABLE LINK ---
+              pdfDoc.textWithLink(telegramText, margin, currentFooterY, { url: telegramUrl });
+              pdfDoc.setTextColor(0,0,0); // Reset color
+              
+              const pageNumText = `Page ${pageNum} of ${totalPages}`;
+              pdfDoc.text(pageNumText, pageW - margin - pdfDoc.getTextWidth(pageNumText), currentFooterY);
+          };
+          const addTextWithPotentialPageBreak = (text: string | null | undefined, x: number, currentY: number, options?: any): number => {
+              if (!text || !text.trim()) return currentY; const fontSize = options?.fontSize || 10; const fontStyle = options?.fontStyle || 'normal'; const textMaxWidth = options?.maxWidth || lineMaxW; pdfDoc.setFontSize(fontSize).setFont('helvetica', fontStyle); const lines = pdfDoc.splitTextToSize(text, textMaxWidth); const lineHeight = pdfDoc.getLineHeightFactor() * fontSize * (options?.lineHeightFactor || 1.0); let newY = currentY;
+              for (const line of lines) { if (newY + lineHeight > pageH - margin - footerReserve) { addFooterToPage(currentPageNum, 0); currentPageNum++; newY = addPageWithHeader(); pdfDoc.setFontSize(fontSize).setFont('helvetica', fontStyle); } pdfDoc.text(line, x, newY); newY += lineHeight; } return newY + (fontSize * 0.15);
+          };
+
           yPos = addPageWithHeader();
           questionsToDownload.forEach((q, index) => {
               const questionText = `${index + 1}. ${q.question || 'Missing Question Text'}`; yPos = addTextWithPotentialPageBreak(questionText, margin, yPos, { fontStyle: 'bold', fontSize: 11, lineHeightFactor: 0.9 }); yPos += 2;
@@ -329,11 +462,21 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
               yPos = addTextWithPotentialPageBreak(answerText, margin + 15, yPos, { maxWidth: lineMaxW - 15, fontStyle: 'italic', fontSize: 9 }); yPos += 2;
               if (q.explanation) { yPos = addTextWithPotentialPageBreak(`Explanation: ${q.explanation}`, margin + 15, yPos, { maxWidth: lineMaxW - 15, fontStyle: 'italic', fontSize: 9}); yPos += 2; }
               yPos += 8;
-              if (index < questionsToDownload.length - 1) { if (yPos + 15 > pageH - margin - footerReserve) { addFooterToPage(currentPageNum, 0); currentPageNum++; yPos = addPageWithHeader(); } else { doc.setLineWidth(0.2).line(margin, yPos, pageW - margin, yPos); yPos += 10; }}
+              if (index < questionsToDownload.length - 1) { if (yPos + 15 > pageH - margin - footerReserve) { addFooterToPage(currentPageNum, 0); currentPageNum++; yPos = addPageWithHeader(); } else { pdfDoc.setLineWidth(0.2).line(margin, yPos, pageW - margin, yPos); yPos += 10; }}
           });
-          const finalTotalPages = currentPageNum; for (let i = 1; i <= finalTotalPages; i++) { addFooterToPage(i, finalTotalPages); }
-          dismissGenQToast(); const fileSub = (subject || 'Questions').replace(/ /g,'_'); const fileGrade = grade || 'N_A'; const filePages = (startPage !== undefined && endPage !== undefined) ? `_p${startPage}-${endPage}` : ''; const filename = `${fileSub}_G${fileGrade}${filePages}_${activeQuestionTab}_Qs.pdf`;
-          doc.save(filename); toast({ title: "Download Started", description: `Downloading ${filename}`});
+          
+          const finalTotalPages = currentPageNum; 
+          for (let i = 1; i <= finalTotalPages; i++) { addFooterToPage(i, finalTotalPages); }
+          
+          dismissGenQToast(); 
+          let filename = `${(subject || 'Questions').replace(/ /g,'_')}_G${grade || 'N_A'}`;
+          // --- MODIFIED FILENAME ---
+          if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage >= startPage) {
+            filename += `_p${startPage}-${endPage}`;
+          }
+          filename += `_${activeQuestionTab}_Qs.pdf`;
+          pdfDoc.save(filename); 
+          toast({ title: "Download Started", description: `Downloading ${filename}`});
       } catch(error: any) { dismissGenQToast(); console.error("Error Qs PDF:", error); toast({ title: "PDF Error", description: `Qs PDF: ${error.message || 'Unknown'}.`, variant: "destructive"}); }
   };
   

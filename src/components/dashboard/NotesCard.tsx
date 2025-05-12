@@ -18,14 +18,12 @@ interface NotesCardProps {
   isSavingNotes: boolean;
   onSaveNotes: () => void;
   onDownloadNotesPdf: () => Promise<void>;
-  // Props for saved notes dropdown
   savedNotesItems: Array<{ key: string; data: SavedNote }>;
   onLoadNote: (key: string) => void;
   onDeleteNote: (key: string) => void;
   isDeletingSavedNoteKey: string | null;
-  // Markdown components
   markdownDisplayComponents: Components;
-  isAnyOtherMajorOpPending: boolean; // To disable save/download if questions are generating etc.
+  isAnyOtherMajorOpPending: boolean;
 }
 
 export const NotesCard: React.FC<NotesCardProps> = ({
@@ -44,11 +42,13 @@ export const NotesCard: React.FC<NotesCardProps> = ({
 }) => {
   return (
     <Card className="shadow-md dark:shadow-slate-800/50 border border-border/50 flex flex-col min-h-[500px] md:min-h-[600px] lg:min-h-[700px] overflow-hidden">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 md:p-6">
-        <CardTitle className="text-base md:text-lg flex items-center gap-2">
+      {/* --- CORRECTED HEADER --- */}
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-y-3 sm:gap-y-0 gap-x-2 pb-3 pt-4 px-4 md:pb-2 md:pt-6 md:px-6">
+        <CardTitle className="text-base md:text-lg flex items-center gap-2 shrink-0">
           <FileText className="h-4 w-4 md:h-5 md:w-5 text-primary/80" /> Generated Notes
         </CardTitle>
-        <div className="flex items-center gap-2">
+        {/* Button Group */}
+        <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full xs:w-auto xs:justify-end"> {/* xs for slightly earlier switch to row */}
           <SavedNotesDropdown
             savedNotesItems={savedNotesItems}
             onLoadNote={onLoadNote}
@@ -58,30 +58,32 @@ export const NotesCard: React.FC<NotesCardProps> = ({
           <Button
             variant="outline"
             size="sm"
+            className="w-full xs:w-auto justify-center" // Ensure text is centered for full-width button
             onClick={onSaveNotes}
             disabled={!generatedNotes.trim() || isGeneratingNotes || isSavingNotes || isAnyOtherMajorOpPending}
             title="Save Current Notes Locally"
           >
             {isSavingNotes ? (
-              <Loader2 className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-1.5 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
             ) : (
-              <Save className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-1.5" />
+              <Save className="h-3.5 w-3.5 mr-1.5" />
             )}
-            <span className="hidden sm:inline">Save</span>
-            <span className="sm:hidden">Save</span>
+            Save
           </Button>
           <Button
             variant="outline"
             size="sm"
+            className="w-full xs:w-auto justify-center" // Ensure text is centered
             onClick={onDownloadNotesPdf}
             disabled={!generatedNotes.trim() || isGeneratingNotes || isSavingNotes || isAnyOtherMajorOpPending}
             title="Download Notes as PDF"
           >
-            <Download className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-1.5" />
-            <span className="hidden sm:inline">Download </span>PDF
+            <Download className="h-3.5 w-3.5 mr-1.5" />
+            PDF
           </Button>
         </div>
       </CardHeader>
+      {/* --- END CORRECTED HEADER --- */}
       <CardContent className="flex-grow flex flex-col p-0">
         {isGeneratingNotes && !generatedNotes ? (
           <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground p-6 text-center">

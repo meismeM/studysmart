@@ -1,7 +1,5 @@
-// src/lib/imageUtils.ts
-
-// Helper function to load an image and return its base64 data URL
-export const loadImageData = (url: string): Promise<string> => { // Add export
+// src/lib/imageUtils.ts (Create this file if it doesn't exist)
+export const loadImageData = (url: string): Promise<string> => {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.crossOrigin = 'Anonymous';
@@ -23,11 +21,10 @@ export const loadImageData = (url: string): Promise<string> => { // Add export
             }
         };
         img.onerror = (err) => {
-            console.error("Error loading image:", err)
+            console.error("Error loading image:", err);
             reject(new Error(`Failed to load image from ${url}`));
         };
         img.src = url;
     });
 };
 
-// You can add other image-related utility functions here in the future

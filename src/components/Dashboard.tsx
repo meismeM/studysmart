@@ -130,7 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterCon
     if (!availableQuestionTypes.includes(activeQuestionTab)) { setActiveQuestionTab('multiple-choice'); }
     setIsSavingNotes(false); setIsSavingQuestions(false);
     scanForSavedItems(); 
-  }, [initialChapterContent, subject, grade, startPage, endPage, activeQuestionTab]); // Added activeQuestionTab to ensure reset if it becomes invalid
+  }, [initialChapterContent, subject, grade, startPage, endPage, activeQuestionTab]);
 
   // === Scan for All Saved Items from Local Storage ===
   const scanForSavedItems = useCallback(() => {
@@ -210,7 +210,15 @@ const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterCon
           </RadioGroup>
           {(isSetSubmitted || isShowingAnswer) && <RevealButton />} {(isSetSubmitted || isShowingAnswer) && <AnswerReveal derivedLetter={null} originalLetter={getCorrectAnswerLetter(finalCorrectIndex)} />}
         </div> );
-    } else { return ( <div className="mt-2 md:mt-3"> <RevealButton /> {isShowingAnswer && <AnswerReveal derivedLetter={null} originalLetter={questionData.answer} />} </div> ); }
+    } else { 
+        return ( 
+            <div className="mt-2 md:mt-3"> 
+                <RevealButton /> 
+                {/* CORRECTED: Ensure questionData.answer is passed as string | null */}
+                {isShowingAnswer && <AnswerReveal derivedLetter={null} originalLetter={questionData.answer ?? null} />} 
+            </div> 
+        ); 
+    }
   };
 
   // === Generation Handlers ===
@@ -301,7 +309,6 @@ const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterCon
     const itemToLoad = savedNotesItems.find(item => item.key === key);
     if (itemToLoad?.data) { 
         setGeneratedNotes(itemToLoad.data.notes); 
-        // Optionally update context, but for now, just load content
         toast({ title: "Note Loaded", description: `Loaded notes for ${itemToLoad.data.subject} G${itemToLoad.data.grade}`}); 
     } else { toast({ title: "Error", description: "Note data not found.", variant: "destructive" }); }
   };
@@ -390,7 +397,12 @@ const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterCon
     thead: ({node, ...props}) => <thead {...props} className="bg-muted/50"/>,
     th: ({node, children, ...props }) => <th {...props} className="px-3 py-2 text-left font-semibold text-foreground whitespace-nowrap">{React.Children.map(children, child => String(child))}</th>,
     td: ({node, children, ...props }) => <td {...props} className="px-3 py-2 text-muted-foreground">{React.Children.map(children, child => String(child))}</td>,
-    pre: ({node, children, ...props}) => <div className="overflow-x-auto w-full bg-muted p-3 my-2 rounded-md text-sm"><pre {...props} className="whitespace-pre-wrap">{children}</pre></div>,
+    pre: ({node, children, ...props}) => (
+      <div className="overflow-x-auto w-full bg-muted p-3 my-2 rounded-md text-sm">
+        {/* Ensure children of pre (which should be a code element) are handled */}
+        <pre {...props}>{children}</pre> 
+      </div>
+    ),
     img: ({node, ...props}) => <img {...props} crossOrigin="anonymous" style={{maxWidth: '100%', height: 'auto', borderRadius: '0.25rem', margin:'0.5rem 0'}} />,
     p: ({node, children, ...props}) => <p {...props} className="mb-2 leading-relaxed text-sm">{children}</p>,
     ul: ({node, children, ...props}) => <ul {...props} className="list-disc pl-5 mb-2 space-y-0.5 text-sm">{children}</ul>,
@@ -403,10 +415,30 @@ const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterCon
     h3: ({node, children, ...props}) => <h3 {...props} className="text-lg font-medium mt-2 mb-1">{children}</h3>,
     strong: ({node, children, ...props}) => <strong {...props}>{React.Children.map(children, child => String(child))}</strong>,
     em: ({node, children, ...props}) => <em {...props}>{React.Children.map(children, child => String(child))}</em>,
-    code: ({node, children, inline, className, ...props}) => {
-        const match = /language-(\w+)/.exec(className || '');
+    code: ({ node, children, className, ...props }) => { // REMOVED 'inline' from props
         const childString = React.Children.toArray(children).map(String).join('');
-        return !inline && match ? ( <div className="text-sm bg-muted p-2 rounded-md my-2 overflow-x-auto"><code className={className} {...props}>{childString.replace(/\n$/, '')}</code></div> ) : ( <code className={`bg-muted/70 text-muted-foreground px-1 py-0.5 rounded font-mono text-xs ${className || ''}`} {...props}>{childString}</code> )
+        const match = /language-(\w+)/.exec(className || '');
+        
+        // If 'match' is true, it's likely a fenced code block.
+        // react-markdown by default wraps fenced code blocks in <pre><code>...</code></pre>.
+        // Our custom 'pre' component above will handle the styling for the <pre> block.
+        // This 'code' component will then render the inner <code>.
+        if (match) { 
+            return (
+                <code className={className} {...props}>
+                    {childString.replace(/\n$/, '')}
+                </code>
+            );
+        }
+        // Otherwise, it's inline code
+        return (
+            <code 
+                className={`bg-muted/70 text-muted-foreground px-1 py-0.5 rounded font-mono text-xs ${className || ''}`} 
+                {...props}
+            >
+                {childString}
+            </code>
+        );
     }
   };
   const markdownPdfComponents: Components = { 
@@ -415,7 +447,6 @@ const Dashboard: React.FC<DashboardProps> = ({ chapterContent: initialChapterCon
     th: ({node, children, ...props}) => <th {...props} style={{border:'1px solid #ddd', padding:'3px', textAlign:'left', fontWeight:'bold', backgroundColor:'#f9f9f9'}}>{React.Children.map(children, child => String(child))}</th>,
     td: ({node, children, ...props}) => <td {...props} style={{border:'1px solid #ddd', padding:'3px', textAlign:'left'}}>{React.Children.map(children, child => String(child))}</td>,
   };
-
 
   // === Main Component Render ===
   return (

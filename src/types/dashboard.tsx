@@ -17,6 +17,17 @@ export type Question = {
   explanation?: string; 
 };
 
+// UserData should reflect your API user object structure
+export type UserData = {
+  id: string | number; // From database
+  phoneNumber: string; // Ensure your API returns this as phoneNumber (camelCase)
+  fullName?: string;    // Ensure your API returns this as fullName
+  gradeLevel?: string;  // Ensure your API returns this as gradeLevel
+  isConfirmed?: boolean;
+  registeredAt?: string; // Or Date
+} | null;
+
+
 export type SavedQuestionSet = {
     questionType: CurrentQuestionTypeValue;
     questions: Question[];

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, Dispatch, SetStateAction } from "react";
-import DashboardContainer from "@/components/DashboardContainer"; 
+import DashboardContainer from "@/components/Dashboard"; 
 import TextbookSelector from "@/components/TextbookSelector";
 import AuthForm from "@/components/AuthForm"; 
 import UserProfile from "@/components/UserProfile"; 

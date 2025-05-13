@@ -1,9 +1,9 @@
 // src/components/UserProfile.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback
 import { Button } from '@/components/ui/button';
-import { LogOut, GraduationCap, Phone, BarChart3, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { LogOut, GraduationCap, Phone, BarChart3, ChevronDown, ChevronUp, Loader2, RefreshCw } from 'lucide-react'; // Added RefreshCw
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +16,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import type { UserData } from '@/types/dashboard'; // UserData type should have 'id'
+import type { UserData } from '@/types/dashboard';
 
 interface PerformanceLog {
   log_id: number;
@@ -29,52 +29,86 @@ interface PerformanceLog {
   timestamp: string;
 }
 
+interface PerformanceAPIResponse {
+    success: boolean;
+    logs?: PerformanceLog[];
+    currentPage?: number;
+    pageSize?: number;
+    totalLogs?: number;
+    totalPages?: number;
+    message?: string;
+}
+
 interface UserProfileProps {
   user: UserData | null;
   onLogout: () => void;
 }
 
+const PAGE_SIZE = 10; // Match API or allow API to dictate
+
 const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
   const [performanceLogs, setPerformanceLogs] = useState<PerformanceLog[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalLogsCount, setTotalLogsCount] = useState(0);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [logsError, setLogsError] = useState<string | null>(null);
   const [showPerformance, setShowPerformance] = useState(false);
 
-  // Log the user prop when it changes or component mounts
-  useEffect(() => {
-    console.log("UserProfile received user prop:", user);
-  }, [user]);
+  const fetchLogs = useCallback(async (pageToFetch: number, append = false) => {
+    if (!user?.id) return;
 
-  useEffect(() => {
-    // Log inside useEffect to see what `user.id` is when attempting fetch
-    console.log("UserProfile useEffect for fetching logs, user?.id:", user?.id, "showPerformance:", showPerformance);
-    if (user?.id && showPerformance) {
-      const fetchLogs = async () => {
-        setIsLoadingLogs(true);
-        setLogsError(null);
-        try {
-          // Use 'id' as the query parameter name
-          const response = await fetch(`/api/get-performance-logs?id=${user.id}`);
-          const data = await response.json();
-          if (response.ok && data.success) {
-            setPerformanceLogs(data.logs || []);
-          } else {
-            setLogsError(data.message || "Failed to load performance data.");
-            setPerformanceLogs([]);
-          }
-        } catch (error) {
-          console.error("Error fetching performance logs:", error);
-          setLogsError("Connection error fetching performance data.");
-          setPerformanceLogs([]);
-        } finally {
-          setIsLoadingLogs(false);
-        }
-      };
-      fetchLogs();
-    } else if (!showPerformance) {
-        setPerformanceLogs([]);
+    setIsLoadingLogs(true);
+    setLogsError(null); // Clear previous errors
+    try {
+      const response = await fetch(`/api/get-performance-logs?id=${user.id}&page=${pageToFetch}&pageSize=${PAGE_SIZE}`);
+      const data: PerformanceAPIResponse = await response.json();
+
+      if (response.ok && data.success && data.logs) {
+        setPerformanceLogs(prevLogs => append ? [...prevLogs, ...data.logs!] : data.logs!);
+        setCurrentPage(data.currentPage || 1);
+        setTotalPages(data.totalPages || 1);
+        setTotalLogsCount(data.totalLogs || 0);
+      } else {
+        setLogsError(data.message || "Failed to load performance data.");
+        if (!append) setPerformanceLogs([]); // Clear if it's a fresh load attempt
+      }
+    } catch (error) {
+      console.error("Error fetching performance logs:", error);
+      setLogsError("Connection error fetching performance data.");
+      if (!append) setPerformanceLogs([]);
+    } finally {
+      setIsLoadingLogs(false);
     }
-  }, [user?.id, showPerformance]);
+  }, [user?.id]); // Dependency on user.id
+
+  // Effect to fetch initial logs when performance section is opened or user changes
+  useEffect(() => {
+    if (user?.id && showPerformance) {
+      setPerformanceLogs([]); // Clear previous logs before fetching new set
+      setCurrentPage(1);      // Reset to page 1
+      fetchLogs(1, false);    // Fetch page 1, don't append
+    } else if (!showPerformance) {
+      setPerformanceLogs([]); // Clear logs if user closes the section
+      setCurrentPage(1);
+      setTotalPages(1);
+    }
+  }, [user?.id, showPerformance, fetchLogs]); // fetchLogs is now stable due to useCallback
+
+  const handleLoadMore = () => {
+    if (currentPage < totalPages && !isLoadingLogs) {
+      fetchLogs(currentPage + 1, true); // Fetch next page and append
+    }
+  };
+
+  const handleRefresh = () => {
+      if (user?.id && showPerformance) {
+          setPerformanceLogs([]);
+          setCurrentPage(1);
+          fetchLogs(1, false);
+      }
+  }
+
 
   if (!user) {
     return null;
@@ -102,8 +136,10 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
     return "bg-red-500 dark:bg-red-600";
   };
 
+  const canLoadMore = currentPage < totalPages;
+
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={(open) => { if (!open) setShowPerformance(false); }}>
       <DropdownMenuTrigger asChild>
          <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
              <Avatar className="h-9 w-9">
@@ -148,13 +184,21 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
         {showPerformance && (
           <>
             <DropdownMenuSeparator />
+            <div className="flex justify-between items-center px-2 pt-1 pb-0.5">
+                <DropdownMenuLabel className="text-xs p-0 font-normal text-muted-foreground">
+                    Recent Scores ({performanceLogs.length} of {totalLogsCount})
+                </DropdownMenuLabel>
+                <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isLoadingLogs} className="h-6 w-6 text-muted-foreground hover:text-primary">
+                    <RefreshCw className={cn("h-3 w-3", isLoadingLogs && "animate-spin")} />
+                </Button>
+            </div>
             <DropdownMenuGroup>
-              {isLoadingLogs && (
+              {isLoadingLogs && performanceLogs.length === 0 && ( // Show main loader only if no logs are displayed yet
                 <DropdownMenuItem disabled className="flex justify-center text-xs py-2">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading performance...
                 </DropdownMenuItem>
               )}
-              {logsError && !isLoadingLogs && (
+              {logsError && !isLoadingLogs && performanceLogs.length === 0 && ( // Show error only if no logs and not loading
                 <DropdownMenuItem disabled className="text-xs text-destructive text-center py-2 px-3">
                   {logsError}
                 </DropdownMenuItem>
@@ -164,8 +208,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
                   No performance data recorded yet.
                 </DropdownMenuItem>
               )}
-              {!isLoadingLogs && !logsError && performanceLogs.length > 0 && (
-                <ScrollArea className="max-h-[200px] pr-1">
+
+              {performanceLogs.length > 0 && (
+                <ScrollArea className="max-h-[180px] pr-1"> {/* Adjusted max height for load more button */}
                   {performanceLogs.map((log) => (
                     <DropdownMenuItem key={log.log_id} className="flex flex-col items-start !p-2.5 focus:bg-accent/50 cursor-default">
                       <div className="flex justify-between w-full mb-1.5">
@@ -180,7 +225,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
                         <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden border border-border/30">
                             <div
                                 className={cn("h-full rounded-l-full transition-all duration-300", getScoreBarColor(log.score))}
-                                style={{ width: `${Math.max(2, log.score)}%` }}
+                                style={{ width: `${Math.max(2, Math.min(100, log.score))}%` }} // Ensure width is between 2 and 100
                             />
                         </div>
                         <span className="text-xs font-semibold w-10 text-right tabular-nums">{log.score.toFixed(0)}%</span>
@@ -194,6 +239,29 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
                   ))}
                 </ScrollArea>
               )}
+
+              {/* Load More Button / Loading More Indicator */}
+              {canLoadMore && !isLoadingLogs && (
+                <DropdownMenuItem
+                  onSelect={(e) => e.preventDefault()} // Prevent closing menu
+                  className="focus:bg-transparent"
+                >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLoadMore}
+                    className="w-full mt-1.5 text-xs"
+                  >
+                    Load More ({totalLogsCount - performanceLogs.length} remaining)
+                  </Button>
+                </DropdownMenuItem>
+              )}
+              {isLoadingLogs && performanceLogs.length > 0 && ( // Show "loading more" if logs are already displayed
+                 <DropdownMenuItem disabled className="flex justify-center text-xs py-2">
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Loading more...
+                </DropdownMenuItem>
+              )}
+
             </DropdownMenuGroup>
           </>
         )}

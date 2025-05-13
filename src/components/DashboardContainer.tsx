@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import ReactDOM from 'react-dom/client'; // For html2canvas PDF notes
+import ReactDOM from 'react-dom/client';
 
 // UI Imports
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,10 +10,10 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Components as ReactMarkdownComponents } from 'react-markdown'; // Renamed to avoid conflict
+import { Components as ReactMarkdownComponents } from 'react-markdown';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Loader2, FileText, Sparkles, AlertCircle } from 'lucide-react'; // Base icons
+import { Loader2, FileText, Sparkles, AlertCircle } from 'lucide-react';
 
 // Child Component Imports
 import { GenerationControlsCard } from './dashboard/GenerationControlsCard';
@@ -35,7 +35,8 @@ import {
 
 // Util Imports
 import { 
-    cn, renderInlineFormatting, getCorrectAnswerLetter, getFinalMcqCorrectIndex 
+    cn, renderInlineFormatting, getCorrectAnswerLetter, getFinalMcqCorrectIndex,
+    createInitialRecordState, createInitialNestedRecordState
 } from '@/lib/utils';
 import { loadImageData } from '@/lib/imageUtils';
 import { jsPDF } from "jspdf";
@@ -49,19 +50,7 @@ interface DashboardContainerProps {
   grade: string;
   startPage?: number;
   endPage?: number;
-}
-
-// --- Helper Functions (moved to utils.ts ideally, but kept here if not moved yet) ---
-// Ensure createInitialRecordState and createInitialNestedRecordState are robust
-function createInitialRecordStateLocal<T>(keys: readonly ExplicitQuestionTypeValue[], defaultValue: T): Record<CurrentQuestionTypeValue, T> { 
-  const i = {} as Record<CurrentQuestionTypeValue, T>; 
-  if (!keys) return i; // Guard against undefined keys
-  keys.forEach(k => i[k] = defaultValue); return i; 
-}
-function createInitialNestedRecordStateLocal<T>(keys: readonly ExplicitQuestionTypeValue[]): Record<CurrentQuestionTypeValue, Record<number, T>> { 
-  const i = {} as Record<CurrentQuestionTypeValue, Record<number,T>>; 
-  if (!keys) return i; // Guard
-  keys.forEach(k => i[k] = {}); return i; 
+  userId?: number | string; // Add userId prop
 }
 
 
@@ -71,6 +60,7 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
   grade,
   startPage,
   endPage,
+  userId, // Destructure userId
 }) => {
   // === Core State ===
   const [chapterContent, setChapterContent] = useState(initialChapterContent);
@@ -82,15 +72,15 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
   const { toast } = useToast();
 
   // === Questions State ===
-  const [generatedQuestions, setGeneratedQuestions] = useState<Record<CurrentQuestionTypeValue, Question[]>>(() => createInitialRecordStateLocal(availableQuestionTypes, []));
-  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState<Record<CurrentQuestionTypeValue, boolean>>(() => createInitialRecordStateLocal(availableQuestionTypes, false));
-  const [questionGenerationMessage, setQuestionGenerationMessage] = useState<Record<CurrentQuestionTypeValue, string | null>>(() => createInitialRecordStateLocal(availableQuestionTypes, null));
-  const [showAnswer, setShowAnswer] = useState<Record<CurrentQuestionTypeValue, Record<number, boolean>>>(() => createInitialNestedRecordStateLocal<boolean>(availableQuestionTypes));
+  const [generatedQuestions, setGeneratedQuestions] = useState<Record<CurrentQuestionTypeValue, Question[]>>(() => createInitialRecordState(availableQuestionTypes, []));
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState<Record<CurrentQuestionTypeValue, boolean>>(() => createInitialRecordState(availableQuestionTypes, false));
+  const [questionGenerationMessage, setQuestionGenerationMessage] = useState<Record<CurrentQuestionTypeValue, string | null>>(() => createInitialRecordState(availableQuestionTypes, null));
+  const [showAnswer, setShowAnswer] = useState<Record<CurrentQuestionTypeValue, Record<number, boolean>>>(() => createInitialNestedRecordState<boolean>(availableQuestionTypes));
 
   // === MCQ Interaction State ===
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<CurrentQuestionTypeValue, Record<number, number | undefined>>>(() => createInitialNestedRecordStateLocal<number | undefined>(availableQuestionTypes));
-  const [submittedMcqs, setSubmittedMcqs] = useState<Record<CurrentQuestionTypeValue, boolean>>(() => createInitialRecordStateLocal(availableQuestionTypes, false));
-  const [mcqScores, setMcqScores] = useState<Record<CurrentQuestionTypeValue, { userScore: number, scorableQuestions: number, totalQuestions: number } | null>>(() => createInitialRecordStateLocal(availableQuestionTypes, null));
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<CurrentQuestionTypeValue, Record<number, number | undefined>>>(() => createInitialNestedRecordState<number | undefined>(availableQuestionTypes));
+  const [submittedMcqs, setSubmittedMcqs] = useState<Record<CurrentQuestionTypeValue, boolean>>(() => createInitialRecordState(availableQuestionTypes, false));
+  const [mcqScores, setMcqScores] = useState<Record<CurrentQuestionTypeValue, { userScore: number, scorableQuestions: number, totalQuestions: number } | null>>(() => createInitialRecordState(availableQuestionTypes, null));
 
   // === Saving/Loading State ===
   const [isSavingNotes, setIsSavingNotes] = useState(false);
@@ -99,17 +89,11 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
   const [savedQuestionSetItems, setSavedQuestionSetItems] = useState<Array<{key: string, data: SavedQuestionSet}>>([]);
   const [isDeletingItem, setIsDeletingItem] = useState<string | null>(null);
 
-  // === Effect for initialChapterContent prop changes (if DashboardContainer is not re-keyed) ===
    useEffect(() => {
      setChapterContent(initialChapterContent);
-     // If you are using a key on DashboardContainer in page.tsx based on initialChapterContent.length,
-     // this component will re-mount, and all state will reset to initial values,
-     // which might be cleaner than this specific useEffect for chapterContent updates.
-     // However, keeping this makes the component slightly more flexible if not re-keyed for content change.
    }, [initialChapterContent]);
 
 
-  // === Scan for All Saved Items from Local Storage ===
   const scanForSavedItems = useCallback(() => {
     const noteItemsList: Array<{key: string, data: SavedNote}> = [];
     const questionSetItemsList: Array<{key: string, data: SavedQuestionSet}> = [];
@@ -135,9 +119,8 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
     setSavedQuestionSetItems(questionSetItemsList);
   }, []);
 
-  useEffect(() => { scanForSavedItems(); }, [scanForSavedItems]); // Scan on mount
+  useEffect(() => { scanForSavedItems(); }, [scanForSavedItems]);
 
-  // === Validation ===
   const validateInputs = (): boolean => { 
     setComponentError(null); let isValid = true; let errorMsg = ''; 
     if (!subject?.trim() || !grade?.trim()) { errorMsg = 'Subject & Grade are required.'; isValid = false; } 
@@ -146,7 +129,6 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
     return isValid; 
   };
   
-  // === Generation Handlers ===
   const handleGenerateNotes = async () => { 
     if (!validateInputs()) return; 
     setGeneratedNotes(''); setIsGeneratingNotes(true); setNoteGenerationMessage("AI generating notes..."); 
@@ -177,31 +159,82 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
     finally { setIsGeneratingQuestions(prev => ({ ...prev, [questionType]: false })); setQuestionGenerationMessage(prev => ({ ...prev, [questionType]: null })); }
   };
 
-  // === MCQ Handlers ===
   const handleMcqOptionSelect = useCallback((questionType: CurrentQuestionTypeValue, questionIndex: number, optionIndex: number) => {
-    // This handler is now passed to QuestionsHubCard, which passes it to QuestionTypeTabContent,
-    // which passes it to QuestionItemRenderer.
-    // Ensure questionType is the active one if called directly from QuestionItemRenderer based on its own type.
-    if (submittedMcqs[questionType]) return; // Use the passed questionType
+    if (submittedMcqs[questionType]) return;
     setSelectedAnswers(prev => ({ 
       ...prev, 
       [questionType]: { ...(prev[questionType] || {}), [questionIndex]: optionIndex } 
     }));
-  }, [submittedMcqs]); // Dependencies might need to include activeQuestionTab if context isn't passed explicitly by type
+  }, [submittedMcqs]);
 
-  const handleSubmitMcq = (questionTypeToSubmit: CurrentQuestionTypeValue) => { // Now takes questionType as param
-    if (questionTypeToSubmit !== 'multiple-choice') return; 
-    const currentQuestions = generatedQuestions[questionTypeToSubmit]; 
+  // --- Function to log performance ---
+  const logMcqPerformance = async (
+    currentUserId: number | string,
+    scorePercentage: number,
+    currentSubject: string,
+    currentGrade: string,
+    totalQuestions: number,
+    correctAnswers: number
+  ) => {
+    try {
+      const response = await fetch('/api/log-performance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUserId,
+          score: scorePercentage,
+          subject: currentSubject,
+          grade: currentGrade,
+          quizType: 'mcq',
+          questionsTotal: totalQuestions,
+          questionsCorrect: correctAnswers,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        console.error("Failed to log performance:", result.message);
+        // Optionally toast an error for the user if critical
+      } else {
+        console.log("MCQ performance logged successfully.");
+      }
+    } catch (error) {
+      console.error("Error calling log-performance API:", error);
+    }
+  };
+
+
+  const handleSubmitMcq = (questionTypeToSubmit: CurrentQuestionTypeValue) => {
+    if (questionTypeToSubmit !== 'multiple-choice') return;
+    const currentQuestions = generatedQuestions[questionTypeToSubmit];
     const currentSelected = selectedAnswers[questionTypeToSubmit];
     if (!currentQuestions || currentQuestions.length === 0) { toast({ title: "No Questions", description: "No MCQs to submit.", variant: "default" }); return; }
     let userCorrectAnswers = 0; let scorableQuestionsCount = 0;
     currentQuestions.forEach((q, index) => { const finalCorrectIdx = getFinalMcqCorrectIndex(q); if (typeof finalCorrectIdx === 'number') { scorableQuestionsCount++; const userAnswerIndex = currentSelected?.[index]; if (userAnswerIndex === finalCorrectIdx) { userCorrectAnswers++; } }});
-    const scoreData = { userScore: userCorrectAnswers, scorableQuestions: scorableQuestionsCount, totalQuestions: currentQuestions.length }; 
-    setMcqScores(prev => ({ ...prev, [questionTypeToSubmit]: scoreData })); 
+    
+    const scoreData = { userScore: userCorrectAnswers, scorableQuestions: scorableQuestionsCount, totalQuestions: currentQuestions.length };
+    setMcqScores(prev => ({ ...prev, [questionTypeToSubmit]: scoreData }));
     setSubmittedMcqs(prev => ({ ...prev, [questionTypeToSubmit]: true }));
-    toast({ title: "MCQ Set Submitted!", description: scorableQuestionsCount > 0 ? `You scored ${userCorrectAnswers}/${scorableQuestionsCount}.` : "Answers submitted.", });
-    const newShowAnswersForTab = { ...(showAnswer[questionTypeToSubmit] || {}) }; 
-    currentQuestions.forEach((_, index) => newShowAnswersForTab[index] = true); 
+    
+    const scorePercentage = scorableQuestionsCount > 0 ? parseFloat(((userCorrectAnswers / scorableQuestionsCount) * 100).toFixed(2)) : 0;
+
+    toast({ title: "MCQ Set Submitted!", description: scorableQuestionsCount > 0 ? `You scored ${userCorrectAnswers}/${scorableQuestionsCount} (${scorePercentage.toFixed(0)}%).` : "Answers submitted.", });
+    
+    // Log performance
+    if (userId && subject && grade) { // Ensure userId, subject, and grade are available
+      logMcqPerformance(
+        userId,
+        scorePercentage,
+        subject, // subject from component props
+        grade,   // grade from component props
+        currentQuestions.length,
+        userCorrectAnswers
+      );
+    } else {
+      console.warn("User ID, Subject, or Grade not available in DashboardContainer, cannot log performance.");
+    }
+
+    const newShowAnswersForTab = { ...(showAnswer[questionTypeToSubmit] || {}) };
+    currentQuestions.forEach((_, index) => newShowAnswersForTab[index] = true);
     setShowAnswer(prev => ({...prev, [questionTypeToSubmit]: newShowAnswersForTab }));
   };
   
@@ -216,7 +249,6 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
   };
 
 
-  // === Save & Load Handlers ===
   const handleSaveNotesToLocalStorage = () => { 
     if (!validateInputs()) return;
     if (!generatedNotes.trim()) { toast({ title: "No Notes", description: "Nothing to save.", variant: "default" }); return; } 
@@ -282,7 +314,6 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
     finally { setIsDeletingItem(null); } 
   };
 
-// --- PDF Download Functions ---
 const handleDownloadNotesPdf = async () => {
     if (!generatedNotes.trim()) { toast({ title: "Cannot Download", description: "No notes generated.", variant: "destructive" }); return; }
     const { id: generatingToastId, dismiss: dismissGeneratingToast } = toast({ title: "Generating Visual PDF...", description: "Please wait...", duration: Infinity, });
@@ -301,7 +332,7 @@ const handleDownloadNotesPdf = async () => {
       
       const mainCanvas = await html2canvas(captureContainer, { 
           scale: 2, useCORS: true, logging: false, removeContainer: false, 
-          onclone: (clonedDoc) => { // Renamed to avoid conflict in outer scope if 'doc' is used
+          onclone: (clonedDoc) => {
               const isDark = document.documentElement.classList.contains('dark');
               clonedDoc.documentElement.classList.toggle('dark', isDark); 
               clonedDoc.body.classList.toggle('dark', isDark);
@@ -309,11 +340,11 @@ const handleDownloadNotesPdf = async () => {
       });
       reactRoot.unmount(); document.body.removeChild(captureContainer);
 
-      const pdfDoc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' }); // Renamed to pdfDoc to avoid conflict
+      const pdfDoc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' }); 
       const pdfW = pdfDoc.internal.pageSize.getWidth(); 
       const pdfH = pdfDoc.internal.pageSize.getHeight(); 
       const margin = 40; 
-      const footerH_pdf = 50; // Increased footer height for link and page number
+      const footerH_pdf = 50; 
       const contentW = pdfW - margin * 2; 
       const imgOrigW = mainCanvas.width; 
       const imgOrigH = mainCanvas.height; 
@@ -327,13 +358,11 @@ const handleDownloadNotesPdf = async () => {
           if (logoDataUrl) { const logoS=30; pdfDoc.addImage(logoDataUrl,'PNG',pdfW-margin-logoS,margin-15,logoS,logoS); hY=Math.max(hY,margin-15+logoS+10); }
           pdfDoc.setFont('helvetica','bold').setFontSize(14); 
           
-          // --- MODIFIED TITLE ---
           let titleString = `Study Notes: ${subject||'Notes'}`;
           if (grade) titleString += ` - G${grade}`;
           if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage >= startPage) {
             titleString += ` (Pages ${startPage}-${endPage})`;
           }
-          // --- END MODIFIED TITLE ---
 
           const titleLines = pdfDoc.splitTextToSize(titleString,pdfW-margin*2-(logoDataUrl?45:0)); 
           pdfDoc.text(titleLines,margin,hY); 
@@ -348,10 +377,9 @@ const handleDownloadNotesPdf = async () => {
           
           const telegramText = "Telegram: @grade9to12ethiopia";
           const telegramUrl = "https://t.me/grade9to12ethiopia";
-          pdfDoc.setTextColor(0, 0, 238); // Standard link blue
-          // --- MODIFIED FOR CLICKABLE LINK ---
+          pdfDoc.setTextColor(0, 0, 238); 
           pdfDoc.textWithLink(telegramText, margin, cFY, { url: telegramUrl });
-          pdfDoc.setTextColor(0,0,0); // Reset text color
+          pdfDoc.setTextColor(0,0,0); 
           
           const pTxt=`Page ${pg} of ${total}`; 
           pdfDoc.text(pTxt,pdfW-margin-pdfDoc.getTextWidth(pTxt),cFY);
@@ -378,7 +406,6 @@ const handleDownloadNotesPdf = async () => {
       for (let i = 1; i <= totalPgs; i++) { pdfDoc.setPage(i); addFooter(i, totalPgs); }
       
       let fName = `${(subject||'Notes').replace(/ /g,'_')}_G${grade||'N_A'}`;
-      // --- MODIFIED FILENAME ---
       if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage >= startPage) {
         fName += `_p${startPage}-${endPage}`;
       }
@@ -397,7 +424,7 @@ const handleDownloadNotesPdf = async () => {
       try {
           let logoDataUrl: string | null = null; try { logoDataUrl = await loadImageData('/logo.png'); } catch (e:any) { console.warn("Logo PDF fail:", e.message); }
           
-          const pdfDoc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' }); // Renamed to pdfDoc
+          const pdfDoc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
           const pageH = pdfDoc.internal.pageSize.height; const pageW = pdfDoc.internal.pageSize.width; 
           const margin = 40; const lineMaxW = pageW - margin * 2; let yPos = margin; 
           const footerReserve = 60;
@@ -409,13 +436,11 @@ const handleDownloadNotesPdf = async () => {
               if (logoDataUrl) { const logoS=30; pdfDoc.addImage(logoDataUrl, 'PNG', pageW - margin - logoS, margin - 15, logoS, logoS); currentY = Math.max(currentY, margin - 15 + logoS + 10); } 
               pdfDoc.setFont("helvetica", "bold").setFontSize(14); 
               
-              // --- MODIFIED TITLE ---
               let title = `Practice Questions: ${subject || 'Unknown'}`;
               if (grade) title += ` - Grade ${grade}`;
               if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage >= startPage) {
                 title += ` (Pages ${startPage}-${endPage})`;
               }
-              // --- END MODIFIED TITLE ---
 
               const titleLines = pdfDoc.splitTextToSize(title, lineMaxW - (logoDataUrl ? 45 : 0)); 
               pdfDoc.text(titleLines, margin, currentY); 
@@ -433,17 +458,11 @@ const handleDownloadNotesPdf = async () => {
               let currentFooterY = footSY + 15; 
               pdfDoc.setFontSize(8).setFont('helvetica', 'italic'); 
               
-              // Removed explicit "Source Pages" from here as it's now in the header title
-              // if (startPage !== undefined && endPage !== undefined) { 
-              //     pdfDoc.text(`Source Pages: ${startPage} - ${endPage}`, margin, currentFooterY); currentFooterY += 10; 
-              // } 
-              
               const telegramText = "Telegram: @grade9to12ethiopia";
               const telegramUrl = "https://t.me/grade9to12ethiopia";
-              pdfDoc.setTextColor(0, 0, 238); // Blue
-              // --- MODIFIED FOR CLICKABLE LINK ---
+              pdfDoc.setTextColor(0, 0, 238); 
               pdfDoc.textWithLink(telegramText, margin, currentFooterY, { url: telegramUrl });
-              pdfDoc.setTextColor(0,0,0); // Reset color
+              pdfDoc.setTextColor(0,0,0); 
               
               const pageNumText = `Page ${pageNum} of ${totalPages}`;
               pdfDoc.text(pageNumText, pageW - margin - pdfDoc.getTextWidth(pageNumText), currentFooterY);
@@ -470,7 +489,6 @@ const handleDownloadNotesPdf = async () => {
           
           dismissGenQToast(); 
           let filename = `${(subject || 'Questions').replace(/ /g,'_')}_G${grade || 'N_A'}`;
-          // --- MODIFIED FILENAME ---
           if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage >= startPage) {
             filename += `_p${startPage}-${endPage}`;
           }
@@ -480,7 +498,6 @@ const handleDownloadNotesPdf = async () => {
       } catch(error: any) { dismissGenQToast(); console.error("Error Qs PDF:", error); toast({ title: "PDF Error", description: `Qs PDF: ${error.message || 'Unknown'}.`, variant: "destructive"}); }
   };
   
-  // --- Markdown Components Definitions ---
   const markdownDisplayComponents: ReactMarkdownComponents = {
     table: ({node, ...props}) => <div className="overflow-x-auto w-full my-4 border border-border rounded-md shadow-sm"><table {...props} className="min-w-full divide-y divide-border text-sm"/></div>,
     thead: ({node, ...props}) => <thead {...props} className="bg-muted/50"/>,
@@ -515,7 +532,6 @@ const handleDownloadNotesPdf = async () => {
     td: ({node, children, ...props}) => <td {...props} style={{border:'1px solid #ddd', padding:'3px', textAlign:'left'}}>{React.Children.map(children, child => String(child))}</td>,
   };
 
-  // Calculate helper for GenerationControlsCard
   const isAnyOperationPending = isGeneratingNotes || Object.values(isGeneratingQuestions).some(Boolean) || isSavingNotes || isSavingQuestions;
 
   return (
@@ -564,9 +580,9 @@ const handleDownloadNotesPdf = async () => {
           onToggleAnswerVisibility={handleToggleAnswerVisibility}
           componentError={componentError}
           isGeneratingNotes={isGeneratingNotes}
-          onDownloadQuestionsPdf={handleDownloadQuestionsPdf}
+          onDownloadQuestionsPdf={handleDownloadQuestionsPdf} // Pass activeQuestionTab implicitly from the hub
           isSavingQuestions={isSavingQuestions}
-          onSaveQuestionSet={handleSaveQuestionSet}
+          onSaveQuestionSet={handleSaveQuestionSet} // Pass activeQuestionTab implicitly from the hub
           savedQuestionSetItems={savedQuestionSetItems}
           onLoadSavedQuestionSet={handleLoadSavedQuestionSet}
           onDeleteSavedQuestionSet={handleDeleteSavedItem}

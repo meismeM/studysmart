@@ -28,13 +28,13 @@ import {
 import { generateNotes } from '@/ai/flows/generate-notes';
 
 // Type Imports
-import { 
-    ExplicitQuestionTypeValue, Question, SavedNote, SavedQuestionSet, 
+import {
+    ExplicitQuestionTypeValue, Question, SavedNote, SavedQuestionSet,
     availableQuestionTypes, questionTypeTitles, CurrentQuestionTypeValue
 } from '@/types/dashboard';
 
 // Util Imports
-import { 
+import {
     cn, renderInlineFormatting, getCorrectAnswerLetter, getFinalMcqCorrectIndex,
     createInitialRecordState, createInitialNestedRecordState
 } from '@/lib/utils';
@@ -50,7 +50,7 @@ interface DashboardContainerProps {
   grade: string;
   startPage?: number;
   endPage?: number;
-  userId?: number | string; // Add userId prop
+  currentUserId?: number | string; // Renamed from userId to currentUserId
 }
 
 
@@ -60,7 +60,7 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
   grade,
   startPage,
   endPage,
-  userId, // Destructure userId
+  currentUserId, // Destructure currentUserId
 }) => {
   // === Core State ===
   const [chapterContent, setChapterContent] = useState(initialChapterContent);
@@ -70,6 +70,12 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
   const [componentError, setComponentError] = useState<string | null>(null);
   const [activeQuestionTab, setActiveQuestionTab] = useState<CurrentQuestionTypeValue>('multiple-choice');
   const { toast } = useToast();
+
+  // Log received currentUserId
+  useEffect(() => {
+    console.log("DashboardContainer received currentUserId:", currentUserId);
+  }, [currentUserId]);
+
 
   // === Questions State ===
   const [generatedQuestions, setGeneratedQuestions] = useState<Record<CurrentQuestionTypeValue, Question[]>>(() => createInitialRecordState(availableQuestionTypes, []));
@@ -121,23 +127,23 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
 
   useEffect(() => { scanForSavedItems(); }, [scanForSavedItems]);
 
-  const validateInputs = (): boolean => { 
-    setComponentError(null); let isValid = true; let errorMsg = ''; 
-    if (!subject?.trim() || !grade?.trim()) { errorMsg = 'Subject & Grade are required.'; isValid = false; } 
-    else if (!chapterContent || chapterContent.trim().length < 20) { errorMsg = 'Chapter content is missing or too short (min 20 characters).'; isValid = false; } 
-    if (!isValid) { toast({ title: 'Input Missing', description: errorMsg, variant: 'destructive' }); setComponentError(errorMsg); } 
-    return isValid; 
+  const validateInputs = (): boolean => {
+    setComponentError(null); let isValid = true; let errorMsg = '';
+    if (!subject?.trim() || !grade?.trim()) { errorMsg = 'Subject & Grade are required.'; isValid = false; }
+    else if (!chapterContent || chapterContent.trim().length < 20) { errorMsg = 'Chapter content is missing or too short (min 20 characters).'; isValid = false; }
+    if (!isValid) { toast({ title: 'Input Missing', description: errorMsg, variant: 'destructive' }); setComponentError(errorMsg); }
+    return isValid;
   };
-  
-  const handleGenerateNotes = async () => { 
-    if (!validateInputs()) return; 
-    setGeneratedNotes(''); setIsGeneratingNotes(true); setNoteGenerationMessage("AI generating notes..."); 
-    try { 
-      const result = await generateNotes({ textbookChapter: chapterContent, gradeLevel: `${grade}th Grade`, subject: subject }); 
-      if (result?.notes?.trim()) { setGeneratedNotes(result.notes); toast({ title: "Success!", description: "Notes generated. Save them manually if desired." }); } 
-      else { throw new Error("AI returned empty notes."); } 
-    } catch (error: any) { const msg = error.message || 'Error generating notes.'; toast({ title: "Notes Error", description: msg, variant: "destructive" }); setComponentError(msg); setGeneratedNotes(''); } 
-    finally { setIsGeneratingNotes(false); setNoteGenerationMessage(null); } 
+
+  const handleGenerateNotes = async () => {
+    if (!validateInputs()) return;
+    setGeneratedNotes(''); setIsGeneratingNotes(true); setNoteGenerationMessage("AI generating notes...");
+    try {
+      const result = await generateNotes({ textbookChapter: chapterContent, gradeLevel: `${grade}th Grade`, subject: subject });
+      if (result?.notes?.trim()) { setGeneratedNotes(result.notes); toast({ title: "Success!", description: "Notes generated. Save them manually if desired." }); }
+      else { throw new Error("AI returned empty notes."); }
+    } catch (error: any) { const msg = error.message || 'Error generating notes.'; toast({ title: "Notes Error", description: msg, variant: "destructive" }); setComponentError(msg); setGeneratedNotes(''); }
+    finally { setIsGeneratingNotes(false); setNoteGenerationMessage(null); }
   };
 
   const handleGenerateQuestions = async (questionType: CurrentQuestionTypeValue) => {
@@ -145,31 +151,30 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
     setGeneratedQuestions(prev => ({ ...prev, [questionType]: [] })); setShowAnswer(prev => ({ ...prev, [questionType]: {} }));
     if (questionType === 'multiple-choice') { setSelectedAnswers(prev => ({ ...prev, [questionType]: {} })); setSubmittedMcqs(prev => ({ ...prev, [questionType]: false })); setMcqScores(prev => ({ ...prev, [questionType]: null }));}
     setIsGeneratingQuestions(prev => ({ ...prev, [questionType]: true })); setQuestionGenerationMessage(prev => ({ ...prev, [questionType]: `AI generating ${typeTitle}...` })); setComponentError(null);
-    try { 
-        const numQuestionsToRequest = 10; 
-        const inputData: GenerateStudyQuestionsInput = { chapterContent, questionType, numberOfQuestions: numQuestionsToRequest, gradeLevel: `${grade}th Grade`, subject }; 
-        const result = await generateStudyQuestions(inputData); 
-        if (result?.questions && Array.isArray(result.questions)) { 
-            const questionsReceived = result.questions as Question[]; 
-            setGeneratedQuestions(prev => ({ ...prev, [questionType]: questionsReceived })); 
-            if (questionsReceived.length > 0) toast({ title: "Success!", description: `${questionsReceived.length} ${typeTitle} questions generated. Save manually if desired.` }); 
-            else toast({ title: "No Questions", description: `AI returned 0 ${typeTitle} questions.`, variant: "default" }); 
-        } else { throw new Error("Invalid question structure from AI."); } 
-    } catch (error: any) { const msg = error.message || `Error generating ${typeTitle}.`; toast({ title: "Question Error", description: msg, variant: "destructive" }); setComponentError(msg); setGeneratedQuestions(prev => ({ ...prev, [questionType]: [] })); } 
+    try {
+        const numQuestionsToRequest = 10;
+        const inputData: GenerateStudyQuestionsInput = { chapterContent, questionType, numberOfQuestions: numQuestionsToRequest, gradeLevel: `${grade}th Grade`, subject };
+        const result = await generateStudyQuestions(inputData);
+        if (result?.questions && Array.isArray(result.questions)) {
+            const questionsReceived = result.questions as Question[];
+            setGeneratedQuestions(prev => ({ ...prev, [questionType]: questionsReceived }));
+            if (questionsReceived.length > 0) toast({ title: "Success!", description: `${questionsReceived.length} ${typeTitle} questions generated. Save manually if desired.` });
+            else toast({ title: "No Questions", description: `AI returned 0 ${typeTitle} questions.`, variant: "default" });
+        } else { throw new Error("Invalid question structure from AI."); }
+    } catch (error: any) { const msg = error.message || `Error generating ${typeTitle}.`; toast({ title: "Question Error", description: msg, variant: "destructive" }); setComponentError(msg); setGeneratedQuestions(prev => ({ ...prev, [questionType]: [] })); }
     finally { setIsGeneratingQuestions(prev => ({ ...prev, [questionType]: false })); setQuestionGenerationMessage(prev => ({ ...prev, [questionType]: null })); }
   };
 
   const handleMcqOptionSelect = useCallback((questionType: CurrentQuestionTypeValue, questionIndex: number, optionIndex: number) => {
     if (submittedMcqs[questionType]) return;
-    setSelectedAnswers(prev => ({ 
-      ...prev, 
-      [questionType]: { ...(prev[questionType] || {}), [questionIndex]: optionIndex } 
+    setSelectedAnswers(prev => ({
+      ...prev,
+      [questionType]: { ...(prev[questionType] || {}), [questionIndex]: optionIndex }
     }));
   }, [submittedMcqs]);
 
-  // --- Function to log performance ---
   const logMcqPerformance = async (
-    currentUserId: number | string,
+    userIdentifier: number | string, // Changed from currentUserId to userIdentifier
     scorePercentage: number,
     currentSubject: string,
     currentGrade: string,
@@ -181,7 +186,7 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: currentUserId,
+          id: userIdentifier, // Send as 'id' to match API expectation
           score: scorePercentage,
           subject: currentSubject,
           grade: currentGrade,
@@ -193,7 +198,6 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
       const result = await response.json();
       if (!response.ok || !result.success) {
         console.error("Failed to log performance:", result.message);
-        // Optionally toast an error for the user if critical
       } else {
         console.log("MCQ performance logged successfully.");
       }
@@ -210,57 +214,56 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
     if (!currentQuestions || currentQuestions.length === 0) { toast({ title: "No Questions", description: "No MCQs to submit.", variant: "default" }); return; }
     let userCorrectAnswers = 0; let scorableQuestionsCount = 0;
     currentQuestions.forEach((q, index) => { const finalCorrectIdx = getFinalMcqCorrectIndex(q); if (typeof finalCorrectIdx === 'number') { scorableQuestionsCount++; const userAnswerIndex = currentSelected?.[index]; if (userAnswerIndex === finalCorrectIdx) { userCorrectAnswers++; } }});
-    
+
     const scoreData = { userScore: userCorrectAnswers, scorableQuestions: scorableQuestionsCount, totalQuestions: currentQuestions.length };
     setMcqScores(prev => ({ ...prev, [questionTypeToSubmit]: scoreData }));
     setSubmittedMcqs(prev => ({ ...prev, [questionTypeToSubmit]: true }));
-    
+
     const scorePercentage = scorableQuestionsCount > 0 ? parseFloat(((userCorrectAnswers / scorableQuestionsCount) * 100).toFixed(2)) : 0;
 
     toast({ title: "MCQ Set Submitted!", description: scorableQuestionsCount > 0 ? `You scored ${userCorrectAnswers}/${scorableQuestionsCount} (${scorePercentage.toFixed(0)}%).` : "Answers submitted.", });
-    
-    // Log performance
-    if (userId && subject && grade) { // Ensure userId, subject, and grade are available
+
+    if (currentUserId && subject && grade) { // Use currentUserId prop here
       logMcqPerformance(
-        userId,
+        currentUserId,
         scorePercentage,
-        subject, // subject from component props
-        grade,   // grade from component props
+        subject,
+        grade,
         currentQuestions.length,
         userCorrectAnswers
       );
     } else {
-      console.warn("User ID, Subject, or Grade not available in DashboardContainer, cannot log performance.");
+      console.warn("currentUserId, Subject, or Grade not available in DashboardContainer, cannot log performance.");
     }
 
     const newShowAnswersForTab = { ...(showAnswer[questionTypeToSubmit] || {}) };
     currentQuestions.forEach((_, index) => newShowAnswersForTab[index] = true);
     setShowAnswer(prev => ({...prev, [questionTypeToSubmit]: newShowAnswersForTab }));
   };
-  
+
   const handleToggleAnswerVisibility = (questionType: CurrentQuestionTypeValue, index: number) => {
     setShowAnswer((prev) => {
       const currentTypeAnswers = prev[questionType] ?? {};
-      return { 
-        ...prev, 
-        [questionType]: { ...currentTypeAnswers, [index]: !currentTypeAnswers[index] } 
+      return {
+        ...prev,
+        [questionType]: { ...currentTypeAnswers, [index]: !currentTypeAnswers[index] }
       };
     });
   };
 
 
-  const handleSaveNotesToLocalStorage = () => { 
+  const handleSaveNotesToLocalStorage = () => {
     if (!validateInputs()) return;
-    if (!generatedNotes.trim()) { toast({ title: "No Notes", description: "Nothing to save.", variant: "default" }); return; } 
-    setIsSavingNotes(true); 
-    try { 
+    if (!generatedNotes.trim()) { toast({ title: "No Notes", description: "Nothing to save.", variant: "default" }); return; }
+    setIsSavingNotes(true);
+    try {
         const noteData: SavedNote = { notes: generatedNotes, timestamp: Date.now(), subject, grade, startPage, endPage, chapterContentSnippet: chapterContent.substring(0,100) };
-        const noteKey = `studyAid_note_${noteData.timestamp}`; 
-        localStorage.setItem(noteKey, JSON.stringify(noteData)); 
-        toast({ title: "Notes Saved Locally!", description: `New note entry created.` }); 
-        scanForSavedItems(); 
-    } catch (error:any) { console.error("Error saving notes:", error); toast({ title: "Save Error", description: error.message || "Could not save notes locally.", variant: "destructive" }); } 
-    finally { setIsSavingNotes(false); } 
+        const noteKey = `studyAid_note_${noteData.timestamp}`;
+        localStorage.setItem(noteKey, JSON.stringify(noteData));
+        toast({ title: "Notes Saved Locally!", description: `New note entry created.` });
+        scanForSavedItems();
+    } catch (error:any) { console.error("Error saving notes:", error); toast({ title: "Save Error", description: error.message || "Could not save notes locally.", variant: "destructive" }); }
+    finally { setIsSavingNotes(false); }
   };
 
   const handleSaveQuestionSet = (questionTypeToSave: CurrentQuestionTypeValue) => {
@@ -278,21 +281,21 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
         localStorage.setItem(questionSetKey, JSON.stringify(questionSetData));
         toast({ title: "Question Set Saved!", description: `Saved ${questionTypeTitles[questionTypeToSave]} locally.` });
         scanForSavedItems();
-    } catch (error: any) { console.error("Error saving Qs:", error); toast({ title: "Save Error", description: error.message || "Could not save Qs.", variant: "destructive" }); } 
+    } catch (error: any) { console.error("Error saving Qs:", error); toast({ title: "Save Error", description: error.message || "Could not save Qs.", variant: "destructive" }); }
     finally { setIsSavingQuestions(false); }
   };
 
-  const handleLoadSavedNote = (key: string) => { 
-    setIsDeletingItem(null); 
+  const handleLoadSavedNote = (key: string) => {
+    setIsDeletingItem(null);
     const itemToLoad = savedNotesItems.find(item => item.key === key);
-    if (itemToLoad?.data) { 
-        setGeneratedNotes(itemToLoad.data.notes); 
-        toast({ title: "Note Loaded", description: `Loaded notes for ${itemToLoad.data.subject} G${itemToLoad.data.grade}`}); 
+    if (itemToLoad?.data) {
+        setGeneratedNotes(itemToLoad.data.notes);
+        toast({ title: "Note Loaded", description: `Loaded notes for ${itemToLoad.data.subject} G${itemToLoad.data.grade}`});
     } else { toast({ title: "Error", description: "Note data not found.", variant: "destructive" }); }
   };
-  
+
   const handleLoadSavedQuestionSet = (key: string) => {
-    setIsDeletingItem(null); 
+    setIsDeletingItem(null);
     const itemToLoad = savedQuestionSetItems.find(item => item.key === key);
     if (itemToLoad?.data) {
         const { questionType, questions, selectedAnswers: sa, isSubmitted: isSub, score: sc, subject:s, grade:g } = itemToLoad.data;
@@ -307,11 +310,11 @@ const DashboardContainer: React.FC<DashboardContainerProps> = ({
     } else { toast({ title: "Error", description: "Could not find saved Qs data.", variant: "destructive" }); }
   };
 
-  const handleDeleteSavedItem = (key: string) => { 
-    if (!key) return; setIsDeletingItem(key); 
-    try { localStorage.removeItem(key); toast({ title: "Item Deleted" }); scanForSavedItems(); } 
-    catch (error: any) { toast({ title: "Delete Error", description:error.message || "Could not delete.", variant: "destructive" }); } 
-    finally { setIsDeletingItem(null); } 
+  const handleDeleteSavedItem = (key: string) => {
+    if (!key) return; setIsDeletingItem(key);
+    try { localStorage.removeItem(key); toast({ title: "Item Deleted" }); scanForSavedItems(); }
+    catch (error: any) { toast({ title: "Delete Error", description:error.message || "Could not delete.", variant: "destructive" }); }
+    finally { setIsDeletingItem(null); }
   };
 
 const handleDownloadNotesPdf = async () => {
@@ -319,151 +322,151 @@ const handleDownloadNotesPdf = async () => {
     const { id: generatingToastId, dismiss: dismissGeneratingToast } = toast({ title: "Generating Visual PDF...", description: "Please wait...", duration: Infinity, });
     try {
       let logoDataUrl: string | null = null; try { logoDataUrl = await loadImageData('/logo.png'); } catch (e: any) { console.warn("Logo load error:", e.message); }
-      
-      const captureContainer = document.createElement('div'); 
-      captureContainer.id = 'pdf-visual-capture-area'; 
+
+      const captureContainer = document.createElement('div');
+      captureContainer.id = 'pdf-visual-capture-area';
       Object.assign(captureContainer.style, { position: 'absolute', left: '-9999px', top: '-9999px', width: '800px', padding: '20px', background: 'white' });
-      if (document.documentElement.classList.contains('dark')) { captureContainer.classList.add('dark'); } 
+      if (document.documentElement.classList.contains('dark')) { captureContainer.classList.add('dark'); }
       document.body.appendChild(captureContainer);
-      
+
       const reactRoot = ReactDOM.createRoot(captureContainer);
       reactRoot.render( <React.StrictMode> <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none"> <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownPdfComponents}>{generatedNotes}</ReactMarkdown> </div> </React.StrictMode> );
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const mainCanvas = await html2canvas(captureContainer, { 
-          scale: 2, useCORS: true, logging: false, removeContainer: false, 
+
+      const mainCanvas = await html2canvas(captureContainer, {
+          scale: 2, useCORS: true, logging: false, removeContainer: false,
           onclone: (clonedDoc) => {
               const isDark = document.documentElement.classList.contains('dark');
-              clonedDoc.documentElement.classList.toggle('dark', isDark); 
+              clonedDoc.documentElement.classList.toggle('dark', isDark);
               clonedDoc.body.classList.toggle('dark', isDark);
           }
       });
       reactRoot.unmount(); document.body.removeChild(captureContainer);
 
-      const pdfDoc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' }); 
-      const pdfW = pdfDoc.internal.pageSize.getWidth(); 
-      const pdfH = pdfDoc.internal.pageSize.getHeight(); 
-      const margin = 40; 
-      const footerH_pdf = 50; 
-      const contentW = pdfW - margin * 2; 
-      const imgOrigW = mainCanvas.width; 
-      const imgOrigH = mainCanvas.height; 
-      const pdfImgRenderW = contentW; 
-      const scale = pdfImgRenderW / imgOrigW; 
-      let yOffset = 0; 
+      const pdfDoc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+      const pdfW = pdfDoc.internal.pageSize.getWidth();
+      const pdfH = pdfDoc.internal.pageSize.getHeight();
+      const margin = 40;
+      const footerH_pdf = 50;
+      const contentW = pdfW - margin * 2;
+      const imgOrigW = mainCanvas.width;
+      const imgOrigH = mainCanvas.height;
+      const pdfImgRenderW = contentW;
+      const scale = pdfImgRenderW / imgOrigW;
+      let yOffset = 0;
       let pageNum = 0;
 
-      const addHeader = (): number => { 
-          let hY = margin; 
+      const addHeader = (): number => {
+          let hY = margin;
           if (logoDataUrl) { const logoS=30; pdfDoc.addImage(logoDataUrl,'PNG',pdfW-margin-logoS,margin-15,logoS,logoS); hY=Math.max(hY,margin-15+logoS+10); }
-          pdfDoc.setFont('helvetica','bold').setFontSize(14); 
-          
+          pdfDoc.setFont('helvetica','bold').setFontSize(14);
+
           let titleString = `Study Notes: ${subject||'Notes'}`;
           if (grade) titleString += ` - G${grade}`;
           if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage >= startPage) {
             titleString += ` (Pages ${startPage}-${endPage})`;
           }
 
-          const titleLines = pdfDoc.splitTextToSize(titleString,pdfW-margin*2-(logoDataUrl?45:0)); 
-          pdfDoc.text(titleLines,margin,hY); 
-          hY+=pdfDoc.getTextDimensions(titleLines.join('\n')).h+10; 
-          pdfDoc.setLineWidth(.5).line(margin,hY,pdfW-margin,hY); return hY+15; 
+          const titleLines = pdfDoc.splitTextToSize(titleString,pdfW-margin*2-(logoDataUrl?45:0));
+          pdfDoc.text(titleLines,margin,hY);
+          hY+=pdfDoc.getTextDimensions(titleLines.join('\n')).h+10;
+          pdfDoc.setLineWidth(.5).line(margin,hY,pdfW-margin,hY); return hY+15;
       };
-      const addFooter = (pg: number, total: number) => { 
-          const fSY=pdfH-margin-footerH_pdf+10; 
-          pdfDoc.setLineWidth(.2).line(margin,fSY,pdfW-margin,fSY); 
-          let cFY=fSY+15; 
-          pdfDoc.setFontSize(8).setFont('helvetica','italic'); 
-          
+      const addFooter = (pg: number, total: number) => {
+          const fSY=pdfH-margin-footerH_pdf+10;
+          pdfDoc.setLineWidth(.2).line(margin,fSY,pdfW-margin,fSY);
+          let cFY=fSY+15;
+          pdfDoc.setFontSize(8).setFont('helvetica','italic');
+
           const telegramText = "Telegram: @grade9to12ethiopia";
           const telegramUrl = "https://t.me/grade9to12ethiopia";
-          pdfDoc.setTextColor(0, 0, 238); 
+          pdfDoc.setTextColor(0, 0, 238);
           pdfDoc.textWithLink(telegramText, margin, cFY, { url: telegramUrl });
-          pdfDoc.setTextColor(0,0,0); 
-          
-          const pTxt=`Page ${pg} of ${total}`; 
+          pdfDoc.setTextColor(0,0,0);
+
+          const pTxt=`Page ${pg} of ${total}`;
           pdfDoc.text(pTxt,pdfW-margin-pdfDoc.getTextWidth(pTxt),cFY);
       };
 
-      while (yOffset < imgOrigH) { 
-          pageNum++; if (pageNum > 1) pdfDoc.addPage(); 
-          pdfDoc.setPage(pageNum); 
-          const contentSY = addHeader(); 
-          const availH = pdfH - contentSY - margin - footerH_pdf; 
-          if (availH <= 0) { if (pageNum > 50) {console.error("PDF gen error (notes): available height too small."); break;} continue; } 
-          let segH = availH / scale; 
-          segH = Math.min(segH, imgOrigH - yOffset); 
-          if (segH <= 0) break; 
-          const segCan = document.createElement('canvas'); segCan.width = imgOrigW; segCan.height = segH; 
-          const segCtx = segCan.getContext('2d'); 
-          if (segCtx) { 
-              segCtx.drawImage(mainCanvas, 0, yOffset, imgOrigW, segH, 0, 0, imgOrigW, segH ); 
-              pdfDoc.addImage(segCan.toDataURL('image/png'), 'PNG', margin, contentSY, pdfImgRenderW, segH * scale ); 
-          } 
-          yOffset += segH; 
+      while (yOffset < imgOrigH) {
+          pageNum++; if (pageNum > 1) pdfDoc.addPage();
+          pdfDoc.setPage(pageNum);
+          const contentSY = addHeader();
+          const availH = pdfH - contentSY - margin - footerH_pdf;
+          if (availH <= 0) { if (pageNum > 50) {console.error("PDF gen error (notes): available height too small."); break;} continue; }
+          let segH = availH / scale;
+          segH = Math.min(segH, imgOrigH - yOffset);
+          if (segH <= 0) break;
+          const segCan = document.createElement('canvas'); segCan.width = imgOrigW; segCan.height = segH;
+          const segCtx = segCan.getContext('2d');
+          if (segCtx) {
+              segCtx.drawImage(mainCanvas, 0, yOffset, imgOrigW, segH, 0, 0, imgOrigW, segH );
+              pdfDoc.addImage(segCan.toDataURL('image/png'), 'PNG', margin, contentSY, pdfImgRenderW, segH * scale );
+          }
+          yOffset += segH;
       }
       const totalPgs = pdfDoc.getNumberOfPages();
       for (let i = 1; i <= totalPgs; i++) { pdfDoc.setPage(i); addFooter(i, totalPgs); }
-      
+
       let fName = `${(subject||'Notes').replace(/ /g,'_')}_G${grade||'N_A'}`;
       if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage >= startPage) {
         fName += `_p${startPage}-${endPage}`;
       }
-      fName += `_Notes_Visual.pdf`; 
+      fName += `_Notes_Visual.pdf`;
       pdfDoc.save(fName);
-      
+
       dismissGeneratingToast(); toast({ title: "Visual PDF Generated!", description: `${fName} downloading.`, duration: 7000 });
     } catch (error: any) { console.error("Visual PDF Error:", error); dismissGeneratingToast(); toast({ title: "PDF Error", description: error.message || "Could not generate visual PDF.", variant: "destructive" }); }
   };
 
   const handleDownloadQuestionsPdf = async () => {
-      const questionsToDownload = generatedQuestions[activeQuestionTab]; 
-      const currentQuestionTypeTitle = questionTypeTitles[activeQuestionTab]; 
+      const questionsToDownload = generatedQuestions[activeQuestionTab];
+      const currentQuestionTypeTitle = questionTypeTitles[activeQuestionTab];
       if (!questionsToDownload || questionsToDownload.length === 0) { toast({ title: "Cannot Download", description: `No ${currentQuestionTypeTitle} questions.`, variant: "destructive"}); return; }
       const { id: genQToastId, dismiss: dismissGenQToast } = toast({ title: `Generating ${currentQuestionTypeTitle} PDF...`, description:"Please wait.", duration: Infinity });
       try {
           let logoDataUrl: string | null = null; try { logoDataUrl = await loadImageData('/logo.png'); } catch (e:any) { console.warn("Logo PDF fail:", e.message); }
-          
+
           const pdfDoc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
-          const pageH = pdfDoc.internal.pageSize.height; const pageW = pdfDoc.internal.pageSize.width; 
-          const margin = 40; const lineMaxW = pageW - margin * 2; let yPos = margin; 
+          const pageH = pdfDoc.internal.pageSize.height; const pageW = pdfDoc.internal.pageSize.width;
+          const margin = 40; const lineMaxW = pageW - margin * 2; let yPos = margin;
           const footerReserve = 60;
           let currentPageNum = 1;
 
-          const addPageWithHeader = (): number => { 
-              if (currentPageNum > 1) { pdfDoc.addPage(); } 
-              pdfDoc.setPage(currentPageNum); let currentY = margin; 
-              if (logoDataUrl) { const logoS=30; pdfDoc.addImage(logoDataUrl, 'PNG', pageW - margin - logoS, margin - 15, logoS, logoS); currentY = Math.max(currentY, margin - 15 + logoS + 10); } 
-              pdfDoc.setFont("helvetica", "bold").setFontSize(14); 
-              
+          const addPageWithHeader = (): number => {
+              if (currentPageNum > 1) { pdfDoc.addPage(); }
+              pdfDoc.setPage(currentPageNum); let currentY = margin;
+              if (logoDataUrl) { const logoS=30; pdfDoc.addImage(logoDataUrl, 'PNG', pageW - margin - logoS, margin - 15, logoS, logoS); currentY = Math.max(currentY, margin - 15 + logoS + 10); }
+              pdfDoc.setFont("helvetica", "bold").setFontSize(14);
+
               let title = `Practice Questions: ${subject || 'Unknown'}`;
               if (grade) title += ` - Grade ${grade}`;
               if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage >= startPage) {
                 title += ` (Pages ${startPage}-${endPage})`;
               }
 
-              const titleLines = pdfDoc.splitTextToSize(title, lineMaxW - (logoDataUrl ? 45 : 0)); 
-              pdfDoc.text(titleLines, margin, currentY); 
-              currentY += pdfDoc.getTextDimensions(titleLines.join('\n')).h + 5; 
-              pdfDoc.setFont("helvetica", "italic").setFontSize(12); 
-              const typeTxt = `Type: ${currentQuestionTypeTitle}`; 
-              pdfDoc.text(typeTxt, margin, currentY); 
-              currentY += pdfDoc.getTextDimensions(typeTxt).h + 10; 
-              pdfDoc.setLineWidth(0.5).line(margin, currentY, pageW - margin, currentY); return currentY + 15; 
+              const titleLines = pdfDoc.splitTextToSize(title, lineMaxW - (logoDataUrl ? 45 : 0));
+              pdfDoc.text(titleLines, margin, currentY);
+              currentY += pdfDoc.getTextDimensions(titleLines.join('\n')).h + 5;
+              pdfDoc.setFont("helvetica", "italic").setFontSize(12);
+              const typeTxt = `Type: ${currentQuestionTypeTitle}`;
+              pdfDoc.text(typeTxt, margin, currentY);
+              currentY += pdfDoc.getTextDimensions(typeTxt).h + 10;
+              pdfDoc.setLineWidth(0.5).line(margin, currentY, pageW - margin, currentY); return currentY + 15;
           };
-          const addFooterToPage = (pageNum: number, totalPages: number) => { 
-              pdfDoc.setPage(pageNum); 
-              const footSY = pageH - margin - footerReserve + 10; 
-              pdfDoc.setLineWidth(0.2).line(margin, footSY, pageW - margin, footSY); 
-              let currentFooterY = footSY + 15; 
-              pdfDoc.setFontSize(8).setFont('helvetica', 'italic'); 
-              
+          const addFooterToPage = (pageNum: number, totalPages: number) => {
+              pdfDoc.setPage(pageNum);
+              const footSY = pageH - margin - footerReserve + 10;
+              pdfDoc.setLineWidth(0.2).line(margin, footSY, pageW - margin, footSY);
+              let currentFooterY = footSY + 15;
+              pdfDoc.setFontSize(8).setFont('helvetica', 'italic');
+
               const telegramText = "Telegram: @grade9to12ethiopia";
               const telegramUrl = "https://t.me/grade9to12ethiopia";
-              pdfDoc.setTextColor(0, 0, 238); 
+              pdfDoc.setTextColor(0, 0, 238);
               pdfDoc.textWithLink(telegramText, margin, currentFooterY, { url: telegramUrl });
-              pdfDoc.setTextColor(0,0,0); 
-              
+              pdfDoc.setTextColor(0,0,0);
+
               const pageNumText = `Page ${pageNum} of ${totalPages}`;
               pdfDoc.text(pageNumText, pageW - margin - pdfDoc.getTextWidth(pageNumText), currentFooterY);
           };
@@ -475,7 +478,7 @@ const handleDownloadNotesPdf = async () => {
           yPos = addPageWithHeader();
           questionsToDownload.forEach((q, index) => {
               const questionText = `${index + 1}. ${q.question || 'Missing Question Text'}`; yPos = addTextWithPotentialPageBreak(questionText, margin, yPos, { fontStyle: 'bold', fontSize: 11, lineHeightFactor: 0.9 }); yPos += 2;
-              if (activeQuestionTab === 'multiple-choice' && q.options && q.options.length > 0) { if (q.options.length !== 4 && q.options.length !== 0) { console.warn(`PDF Gen: MCQ Q${index+1} option count is ${q.options.length}`); } q.options.forEach((opt, optIndex) => { const optionText = `${getCorrectAnswerLetter(optIndex) || '?'}) ${(typeof opt === 'string' ? opt.replace(/✓/g, '').trim() : '[Invalid Option]') || 'Missing Option Text'}`; yPos = addTextWithPotentialPageBreak(optionText, margin + 15, yPos, { maxWidth: lineMaxW - 15, fontSize: 10, lineHeightFactor: 0.9 }); }); yPos += 2; } 
+              if (activeQuestionTab === 'multiple-choice' && q.options && q.options.length > 0) { if (q.options.length !== 4 && q.options.length !== 0) { console.warn(`PDF Gen: MCQ Q${index+1} option count is ${q.options.length}`); } q.options.forEach((opt, optIndex) => { const optionText = `${getCorrectAnswerLetter(optIndex) || '?'}) ${(typeof opt === 'string' ? opt.replace(/✓/g, '').trim() : '[Invalid Option]') || 'Missing Option Text'}`; yPos = addTextWithPotentialPageBreak(optionText, margin + 15, yPos, { maxWidth: lineMaxW - 15, fontSize: 10, lineHeightFactor: 0.9 }); }); yPos += 2; }
               else if (activeQuestionTab === 'multiple-choice') { yPos = addTextWithPotentialPageBreak(`[No options provided or options invalid]`, margin + 15, yPos, {fontStyle: 'italic', fontSize: 9}); }
               let answerText = 'Answer: Not provided'; if (activeQuestionTab !== 'multiple-choice' && q.answer) { answerText = `Answer: ${q.answer}`; } else if (activeQuestionTab === 'multiple-choice') { const correctIdx = getFinalMcqCorrectIndex(q); answerText = `Correct Answer: ${typeof correctIdx === 'number' ? getCorrectAnswerLetter(correctIdx) : 'Could not determine'}`; }
               yPos = addTextWithPotentialPageBreak(answerText, margin + 15, yPos, { maxWidth: lineMaxW - 15, fontStyle: 'italic', fontSize: 9 }); yPos += 2;
@@ -483,21 +486,21 @@ const handleDownloadNotesPdf = async () => {
               yPos += 8;
               if (index < questionsToDownload.length - 1) { if (yPos + 15 > pageH - margin - footerReserve) { addFooterToPage(currentPageNum, 0); currentPageNum++; yPos = addPageWithHeader(); } else { pdfDoc.setLineWidth(0.2).line(margin, yPos, pageW - margin, yPos); yPos += 10; }}
           });
-          
-          const finalTotalPages = currentPageNum; 
+
+          const finalTotalPages = currentPageNum;
           for (let i = 1; i <= finalTotalPages; i++) { addFooterToPage(i, finalTotalPages); }
-          
-          dismissGenQToast(); 
+
+          dismissGenQToast();
           let filename = `${(subject || 'Questions').replace(/ /g,'_')}_G${grade || 'N_A'}`;
           if (typeof startPage === 'number' && typeof endPage === 'number' && startPage > 0 && endPage >= startPage) {
             filename += `_p${startPage}-${endPage}`;
           }
           filename += `_${activeQuestionTab}_Qs.pdf`;
-          pdfDoc.save(filename); 
+          pdfDoc.save(filename);
           toast({ title: "Download Started", description: `Downloading ${filename}`});
       } catch(error: any) { dismissGenQToast(); console.error("Error Qs PDF:", error); toast({ title: "PDF Error", description: `Qs PDF: ${error.message || 'Unknown'}.`, variant: "destructive"}); }
   };
-  
+
   const markdownDisplayComponents: ReactMarkdownComponents = {
     table: ({node, ...props}) => <div className="overflow-x-auto w-full my-4 border border-border rounded-md shadow-sm"><table {...props} className="min-w-full divide-y divide-border text-sm"/></div>,
     thead: ({node, ...props}) => <thead {...props} className="bg-muted/50"/>,
@@ -519,13 +522,13 @@ const handleDownloadNotesPdf = async () => {
     code: ({ node, children, className, ...props }) => {
         const childString = React.Children.toArray(children).map(String).join('');
         const match = /language-(\w+)/.exec(className || '');
-        if (match) { 
+        if (match) {
             return ( <code className={className} {...props}> {childString.replace(/\n$/, '')} </code> );
         }
         return ( <code className={`bg-muted/70 text-muted-foreground px-1 py-0.5 rounded font-mono text-xs ${className || ''}`} {...props}> {childString} </code> );
     }
   };
-  const markdownPdfComponents: ReactMarkdownComponents = { 
+  const markdownPdfComponents: ReactMarkdownComponents = {
     img: ({node, ...props}) => <img {...props} crossOrigin="anonymous" style={{maxWidth: '100%', height: 'auto'}} />,
     table: ({node, children, ...props}) => <table {...props} style={{width: '100%', borderCollapse: 'collapse', fontSize:'9pt', margin:'8px 0'}}>{children}</table>,
     th: ({node, children, ...props}) => <th {...props} style={{border:'1px solid #ddd', padding:'3px', textAlign:'left', fontWeight:'bold', backgroundColor:'#f9f9f9'}}>{React.Children.map(children, child => String(child))}</th>,
@@ -537,7 +540,7 @@ const handleDownloadNotesPdf = async () => {
   return (
     <>
       {componentError && ( <div className="mb-4 md:mb-6 p-4 border border-destructive bg-destructive/10 rounded-lg text-destructive flex items-start text-sm shadow-md"> <AlertCircle className="h-5 w-5 mr-3 shrink-0 mt-0.5"/> <div><p className="font-semibold mb-1">Generation Error</p><p>{componentError}</p></div> </div> )}
-      
+
       <GenerationControlsCard
         isGeneratingNotes={isGeneratingNotes}
         isGeneratingAnyQuestion={Object.values(isGeneratingQuestions).some(Boolean)}
@@ -559,8 +562,8 @@ const handleDownloadNotesPdf = async () => {
           onDownloadNotesPdf={handleDownloadNotesPdf}
           savedNotesItems={savedNotesItems}
           onLoadNote={handleLoadSavedNote}
-          onDeleteNote={handleDeleteSavedItem} 
-          isDeletingSavedNoteKey={isDeletingItem} 
+          onDeleteNote={handleDeleteSavedItem}
+          isDeletingSavedNoteKey={isDeletingItem}
           markdownDisplayComponents={markdownDisplayComponents}
           isAnyOtherMajorOpPending={Object.values(isGeneratingQuestions).some(Boolean) || isSavingQuestions}
         />
@@ -580,9 +583,9 @@ const handleDownloadNotesPdf = async () => {
           onToggleAnswerVisibility={handleToggleAnswerVisibility}
           componentError={componentError}
           isGeneratingNotes={isGeneratingNotes}
-          onDownloadQuestionsPdf={handleDownloadQuestionsPdf} // Pass activeQuestionTab implicitly from the hub
+          onDownloadQuestionsPdf={() => handleDownloadQuestionsPdf()} // Simplified call
           isSavingQuestions={isSavingQuestions}
-          onSaveQuestionSet={handleSaveQuestionSet} // Pass activeQuestionTab implicitly from the hub
+          onSaveQuestionSet={() => handleSaveQuestionSet(activeQuestionTab)} // Pass active tab
           savedQuestionSetItems={savedQuestionSetItems}
           onLoadSavedQuestionSet={handleLoadSavedQuestionSet}
           onDeleteSavedQuestionSet={handleDeleteSavedItem}

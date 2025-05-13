@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import DashboardContainer from "@/components/DashboardContainer"; // Corrected import
+import DashboardContainer from "@/components/DashboardContainer";
 import TextbookSelector from "@/components/TextbookSelector";
 import AuthForm from "@/components/AuthForm";
 import UserProfile from "@/components/UserProfile";
@@ -10,10 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import Image from 'next/image';
-// Toaster is likely in layout.tsx
-// import { Toaster } from "@/components/ui/toaster";
-
-// Import UserData type from the correct location
 import type { UserData } from '@/types/dashboard';
 
 const LOGIN_STATUS_KEY = 'app_login_status';
@@ -40,7 +36,7 @@ export default function Home() {
         const parsedData: UserData = JSON.parse(storedUserData);
         setIsLoggedIn(true);
         setUserData(parsedData);
-        console.log("User restored from local storage:", parsedData);
+        console.log("User restored from local storage:", parsedData); // For debugging
       } catch (e) {
         console.error("Failed to parse user data from local storage", e);
         localStorage.removeItem(LOGIN_STATUS_KEY);
@@ -57,7 +53,7 @@ export default function Home() {
 
   const handleLoginSuccess = (loggedInUser: UserData) => {
     if (!loggedInUser) return;
-    console.log("Handling login success:", loggedInUser);
+    console.log("Handling login success:", loggedInUser); // For debugging
     localStorage.setItem(LOGIN_STATUS_KEY, 'true');
     localStorage.setItem(USER_DATA_KEY, JSON.stringify(loggedInUser));
     setUserData(loggedInUser);
@@ -122,14 +118,13 @@ export default function Home() {
         </aside>
 
         <main className="w-full md:flex-1 p-6 md:p-10 xl:p-12 md:h-screen md:overflow-y-auto pb-28 md:pb-10">
-          {/* ** CORRECTED: Pass userId to DashboardContainer ** */}
           <DashboardContainer
             chapterContent={selectedChapterContent}
             subject={selectedSubject}
             grade={selectedGrade}
             startPage={startPageNum}
             endPage={endPageNum}
-            userId={userData?.id} // Pass the user ID (could be id, phone_number, etc. based on UserData type)
+            currentUserId={userData?.id} // Pass the user's primary ID as currentUserId
           />
         </main>
 

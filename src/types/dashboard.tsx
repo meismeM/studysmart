@@ -19,12 +19,17 @@ export type Question = {
 
 // UserData should reflect your API user object structure
 export type UserData = {
-  id: string | number; // From database
-  phoneNumber: string; // Ensure your API returns this as phoneNumber (camelCase)
-  fullName?: string;    // Ensure your API returns this as fullName
-  gradeLevel?: string;  // Ensure your API returns this as gradeLevel
+  id: string | number; // From database (e.g., users.id)
+  phone_number?: string; // From API (users.phone_number)
+  phoneNumber?: string; // For frontend consistency if preferred
+  full_name?: string;    // From API (users.full_name)
+  fullName?: string;    // For frontend consistency
+  grade_level?: string;  // From API (users.grade_level)
+  gradeLevel?: string;  // For frontend consistency
+  is_confirmed?: boolean; // from users.is_confirmed
   isConfirmed?: boolean;
-  registeredAt?: string; // Or Date
+  registered_at?: string; // Or Date, from users.registered_at
+  registeredAt?: string;
 } | null;
 
 

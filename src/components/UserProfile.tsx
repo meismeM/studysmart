@@ -16,18 +16,17 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import type { UserData } from '@/types/dashboard'; // Import UserData type
+import type { UserData } from '@/types/dashboard'; // UserData type should have 'id'
 
-// Define PerformanceLog type locally or import if moved to types/dashboard.ts
 interface PerformanceLog {
   log_id: number;
-  score: number; // API should ensure this is a number
+  score: number;
   subject: string | null;
   grade: string | null;
   quiz_type: string;
   questions_total: number | null;
   questions_correct: number | null;
-  timestamp: string; // ISO date string
+  timestamp: string;
 }
 
 interface UserProfileProps {
@@ -41,13 +40,21 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
   const [logsError, setLogsError] = useState<string | null>(null);
   const [showPerformance, setShowPerformance] = useState(false);
 
+  // Log the user prop when it changes or component mounts
   useEffect(() => {
+    console.log("UserProfile received user prop:", user);
+  }, [user]);
+
+  useEffect(() => {
+    // Log inside useEffect to see what `user.id` is when attempting fetch
+    console.log("UserProfile useEffect for fetching logs, user?.id:", user?.id, "showPerformance:", showPerformance);
     if (user?.id && showPerformance) {
       const fetchLogs = async () => {
         setIsLoadingLogs(true);
         setLogsError(null);
         try {
-          const response = await fetch(`/api/get-performance-logs?userId=${user.id}`);
+          // Use 'id' as the query parameter name
+          const response = await fetch(`/api/get-performance-logs?id=${user.id}`);
           const data = await response.json();
           if (response.ok && data.success) {
             setPerformanceLogs(data.logs || []);
@@ -69,12 +76,10 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
     }
   }, [user?.id, showPerformance]);
 
-  if (!user) { // Simplified check: if user is null, render nothing or a placeholder
-    console.log("UserProfile: Rendering null because user prop is null.");
+  if (!user) {
     return null;
   }
 
-  // Use optional chaining and fallbacks for robustness
   const displayName = user.fullName || user.full_name || 'User';
   const displayPhone = user.phoneNumber || user.phone_number || 'No phone';
   const displayGrade = user.gradeLevel || user.grade_level;
@@ -93,7 +98,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
 
   const getScoreBarColor = (score: number): string => {
     if (score >= 80) return "bg-green-500 dark:bg-green-600";
-    if (score >= 50 && score < 80) return "bg-yellow-500 dark:bg-yellow-600"; // Optional: for mid-range
+    if (score >= 50 && score < 80) return "bg-yellow-500 dark:bg-yellow-600";
     return "bg-red-500 dark:bg-red-600";
   };
 

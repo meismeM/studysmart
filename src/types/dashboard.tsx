@@ -19,18 +19,19 @@ export type Question = {
 
 // UserData should reflect your API user object structure
 export type UserData = {
-  id: string | number; // From database (e.g., users.id)
-  phone_number?: string; // From API (users.phone_number)
-  phoneNumber?: string; // For frontend consistency if preferred
-  full_name?: string;    // From API (users.full_name)
-  fullName?: string;    // For frontend consistency
-  grade_level?: string;  // From API (users.grade_level)
-  gradeLevel?: string;  // For frontend consistency
-  is_confirmed?: boolean; // from users.is_confirmed
+  id: number | string; // This is users.id, the primary user identifier
+  phone_number?: string;
+  phoneNumber?: string;
+  full_name?: string;
+  fullName?: string;
+  grade_level?: string;
+  gradeLevel?: string;
+  is_confirmed?: boolean;
   isConfirmed?: boolean;
-  registered_at?: string; // Or Date, from users.registered_at
+  registered_at?: string;
   registeredAt?: string;
 } | null;
+
 
 
 export type SavedQuestionSet = {
